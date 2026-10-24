@@ -9,6 +9,9 @@ concurrency:
   group: apk-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,13 +38,30 @@ jobs:
         run: |
           mkdir -p out
           cp app/build/outputs/apk/debug/app-debug.apk "out/Nabra-${GITHUB_SHA::7}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk out/Nabra.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Nabra-debug-apk
-          path: out/*.apk
+          path: out/Nabra-*.apk
           retention-days: 30
+
+      # Direct phone-friendly download: always-updated "latest" release with Nabra.apk
+      - name: Publish latest APK release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "نبرة — آخر نسخة"
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          make_latest: true
+          overwrite_files: true
+          body: |
+            آخر نسخة من نبرة (debug APK) — من الكوميت ${{ github.sha }}.
+            نزّل **Nabra.apk** وثبّته على موبايلك.
+          files: out/Nabra.apk
 
       - name: Upload test reports on failure
         if: failure()

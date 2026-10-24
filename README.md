@@ -16,6 +16,12 @@ AccessibilityService that controls other apps).
 
 Every push builds a debug APK with GitHub Actions.
 
+**Fastest:** direct link to the latest APK:
+https://github.com/tiktok7daniel-stack/Recognize-my-voice-/releases/download/latest/Nabra.apk
+(also listed on the repo's **Releases** page as "نبرة — آخر نسخة").
+
+Or from the build artifacts:
+
 1. Open the repo on GitHub, then **Actions** → **Build APK** → the latest green run.
 2. Under **Artifacts**, download **Nabra-debug-apk** (a zip file), then unzip it.
 3. Open the `.apk` on your phone and allow "Install unknown apps".

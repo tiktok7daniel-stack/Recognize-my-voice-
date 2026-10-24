@@ -52,6 +52,7 @@ import com.daniel.assistant.ui.onboarding.PermissionsScreen
 import com.daniel.assistant.ui.settings.SettingsScreen
 import com.daniel.assistant.ui.theme.Neo
 import com.daniel.assistant.ui.theme.NabraTheme
+import com.daniel.assistant.ui.tutorial.TutorialScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
 
 private object Routes {
     const val INTRO = "intro"
+    const val TUTORIAL = "tutorial"
     const val PERMISSIONS = "permissions"
     const val MODEL = "model"
     const val HOME = "home"
@@ -107,6 +109,7 @@ private fun NabraNav() {
                     scope.launch {
                         val s = c.settings.current()
                         val next = when {
+                            !s.tutorialDone -> Routes.TUTORIAL
                             !s.onboardingDone -> Routes.PERMISSIONS
                             !c.models.isReady() -> Routes.MODEL
                             else -> Routes.HOME
@@ -114,6 +117,33 @@ private fun NabraNav() {
                         nav.navigate(next) { popUpTo(Routes.INTRO) { inclusive = true } }
                     }
                 }
+            }
+            composable(Routes.TUTORIAL) {
+                val firstRun = nav.previousBackStackEntry == null
+                TutorialScreen(
+                    onFinish = {
+                        scope.launch {
+                            c.settings.setTutorialDone(true)
+                            if (firstRun) {
+                                val s = c.settings.current()
+                                val next = when {
+                                    !s.onboardingDone -> Routes.PERMISSIONS
+                                    !c.models.isReady() -> Routes.MODEL
+                                    else -> Routes.HOME
+                                }
+                                nav.navigate(next) { popUpTo(Routes.TUTORIAL) { inclusive = true } }
+                            } else nav.popBackStack()
+                        }
+                    },
+                    onCreateFirstCommand = {
+                        scope.launch { c.settings.setTutorialDone(true) }
+                        if (firstRun) {
+                            nav.navigate(Routes.HOME) { popUpTo(Routes.TUTORIAL) { inclusive = true } }
+                        } else nav.popBackStack()
+                        nav.navigate(Routes.editor(null))
+                    },
+                    onClose = if (firstRun) null else ({ nav.popBackStack() }),
+                )
             }
             composable(Routes.PERMISSIONS) {
                 val firstRun = nav.previousBackStackEntry == null
@@ -143,6 +173,7 @@ private fun NabraNav() {
                 HomeScreen(
                     onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
                     onOpenModel = { nav.navigate(Routes.MODEL) },
+                    onOpenTutorial = { nav.navigate(Routes.TUTORIAL) },
                 )
             }
             composable(Routes.COMMANDS) {
@@ -161,6 +192,7 @@ private fun NabraNav() {
                     onOpenModel = { nav.navigate(Routes.MODEL) },
                     onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
                     onOpenLogs = { nav.navigate(Routes.LOGS) },
+                    onOpenTutorial = { nav.navigate(Routes.TUTORIAL) },
                 )
             }
             composable(Routes.LOGS) { LogsScreen { nav.popBackStack() } }

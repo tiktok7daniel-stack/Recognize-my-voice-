@@ -25,6 +25,8 @@ enum class CueMode(val id: String, val title: String) {
 
 data class AppSettings(
     val onboardingDone: Boolean = false,
+    val tutorialDone: Boolean = false,
+    val editorHintsSeen: Boolean = false,
     val wakeWord: String = "يا مساعد",
     val ttsEnabled: Boolean = true,
     val cueMode: CueMode = CueMode.BOTH,
@@ -46,6 +48,8 @@ class SettingsRepo(private val context: Context) {
 
     private object K {
         val onboardingDone = booleanPreferencesKey("onboarding_done")
+        val tutorialDone = booleanPreferencesKey("tutorial_done")
+        val editorHints = booleanPreferencesKey("editor_hints_seen")
         val wakeWord = stringPreferencesKey("wake_word")
         val tts = booleanPreferencesKey("tts")
         val cue = stringPreferencesKey("cue")
@@ -67,6 +71,8 @@ class SettingsRepo(private val context: Context) {
         val d = AppSettings()
         AppSettings(
             onboardingDone = p[K.onboardingDone] ?: d.onboardingDone,
+            tutorialDone = p[K.tutorialDone] ?: d.tutorialDone,
+            editorHintsSeen = p[K.editorHints] ?: d.editorHintsSeen,
             wakeWord = p[K.wakeWord]?.takeIf { it.isNotBlank() } ?: d.wakeWord,
             ttsEnabled = p[K.tts] ?: d.ttsEnabled,
             cueMode = CueMode.byId(p[K.cue]),
@@ -92,6 +98,8 @@ class SettingsRepo(private val context: Context) {
     }
 
     suspend fun setOnboardingDone(v: Boolean) = edit { it[K.onboardingDone] = v }
+    suspend fun setTutorialDone(v: Boolean) = edit { it[K.tutorialDone] = v }
+    suspend fun setEditorHintsSeen(v: Boolean) = edit { it[K.editorHints] = v }
     suspend fun setWakeWord(v: String) = edit { it[K.wakeWord] = v.trim() }
     suspend fun setTts(v: Boolean) = edit { it[K.tts] = v }
     suspend fun setCue(v: CueMode) = edit { it[K.cue] = v.id }

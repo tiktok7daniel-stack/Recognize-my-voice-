@@ -26,7 +26,10 @@ Local build (optional): `./gradlew assembleDebug` (JDK 17 and Android SDK 35).
 
 ## First launch
 
-1. **Intro**, then **Permissions**. Each permission has a status chip, an explanation,
+1. **Intro**, then a **step-by-step tutorial** (12 short lessons: how listening works, the
+   Accessibility "hands", the voice model, ready-made commands, opening apps, building your
+   first command, troubleshooting, AI). You can reopen it any time from *Home → "إزاي أستخدم نبرة؟"*
+   or *Settings*. Then **Permissions**. Each permission has a status chip, an explanation,
    and a button that opens the right settings page:
    * Microphone, and the Accessibility service ("the hands"). These two are essential.
    * Photos, Notifications, Ignore battery optimizations, Display over other apps.

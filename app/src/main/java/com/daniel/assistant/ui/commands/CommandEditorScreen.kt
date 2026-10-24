@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -74,6 +75,7 @@ private data class UiStep(val key: Long, val step: Step)
 fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
     val c = rememberContainer()
     val scope = rememberCoroutineScope()
+    val settings by c.settings.flow.collectAsState(initial = null)
 
     var name by remember { mutableStateOf("") }
     var enabled by remember { mutableStateOf(true) }
@@ -143,6 +145,24 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (commandId == null && settings?.editorHintsSeen == false) {
+                    item(key = "hint") {
+                        GlassCard(glow = Neo.Cyan) {
+                            Text("إزاي تعمل الأمر؟", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(6.dp))
+                            listOf(
+                                "سجّل كلمة التشغيل بصوتك ٢-٣ مرات (أو اكتبها).",
+                                "دوس \"أضف خطوة\" وضيف الخطوات بالترتيب، واسحب ☰ لتغيير الترتيب.",
+                                "جرّب بزرار ▶ فوق، وبعدين دوس \"حفظ الأمر\".",
+                            ).forEachIndexed { i, t ->
+                                Text("${i + 1}. $t", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 2.dp))
+                            }
+                            TextButton(onClick = { scope.launch { c.settings.setEditorHintsSeen(true) } }) {
+                                Text("فهمت", color = Neo.Cyan)
+                            }
+                        }
+                    }
+                }
                 item(key = "name") {
                     NeoTextField(name, { name = it }, "اسم الأمر (اختياري)")
                 }

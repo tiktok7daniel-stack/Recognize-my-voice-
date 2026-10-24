@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -72,7 +73,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(onOpenModel: () -> Unit, onOpenPermissions: () -> Unit, onOpenLogs: () -> Unit) {
+fun SettingsScreen(
+    onOpenModel: () -> Unit,
+    onOpenPermissions: () -> Unit,
+    onOpenLogs: () -> Unit,
+    onOpenTutorial: () -> Unit,
+) {
     val c = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -235,6 +241,8 @@ fun SettingsScreen(onOpenModel: () -> Unit, onOpenPermissions: () -> Unit, onOpe
                 NavCard(Icons.Filled.History, "السجل", "الأوامر اللي اتنفذت والأخطاء", onOpenLogs)
 
                 SectionTitle("أخرى")
+                NavCard(Icons.Filled.School, "الشرح خطوة بخطوة", "إزاي نبرة بيشتغل وإزاي تعمل أول أمر", onOpenTutorial)
+                Spacer(Modifier.height(10.dp))
                 NavCard(Icons.Filled.Security, "الصلاحيات", "راجع الصلاحيات وإعدادات البطارية", onOpenPermissions)
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {

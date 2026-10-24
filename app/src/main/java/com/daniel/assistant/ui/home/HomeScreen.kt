@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
@@ -62,7 +63,7 @@ import com.daniel.assistant.voice.ModelState
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(onOpenPermissions: () -> Unit, onOpenModel: () -> Unit) {
+fun HomeScreen(onOpenPermissions: () -> Unit, onOpenModel: () -> Unit, onOpenTutorial: () -> Unit) {
     val c = rememberContainer()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -109,6 +110,17 @@ fun HomeScreen(onOpenPermissions: () -> Unit, onOpenModel: () -> Unit) {
                         if (st.grammarMode) "أوفلاين • وضع الأوامر الدقيق" else "أوفلاين • كلام حر",
                         style = MaterialTheme.typography.bodySmall,
                     )
+                }
+            }
+
+            GlassCard(onClick = onOpenTutorial, glow = Neo.Cyan) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBubble(Icons.Filled.School, Neo.Cyan)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("إزاي أستخدم نبرة؟", style = MaterialTheme.typography.titleMedium)
+                        Text("شرح خطوة بخطوة لكل حاجة وإزاي تعمل أول أمر", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
 

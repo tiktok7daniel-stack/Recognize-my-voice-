@@ -64,13 +64,13 @@ fun NabraLogo(
         val sweep = 300f * ringProgress.coerceIn(0f, 1f)
         val ringBrush = Brush.sweepGradient(listOf(Neo.Cyan, Neo.Accent, Neo.Cyan), center)
         // glow
-        drawArc(Neo.Cyan.copy(alpha = 0.18f), -60f, sweep, false, topLeft, arcSize,
+        drawArc(Neo.Cyan.copy(alpha = 0.18f), -20f, sweep, false, topLeft, arcSize,
             style = Stroke(width = s * 0.12f, cap = StrokeCap.Round))
-        drawArc(ringBrush, -60f, sweep, false, topLeft, arcSize,
+        drawArc(ringBrush, -20f, sweep, false, topLeft, arcSize,
             style = Stroke(width = s * 0.055f, cap = StrokeCap.Round))
         // dot at ring start
         if (ringProgress > 0.98f) {
-            drawCircle(Neo.Cyan, radius = s * 0.035f, center = Offset(center.x + ringR * 0.5f, center.y - ringR * 0.866f))
+            drawCircle(Neo.Cyan, radius = s * 0.035f, center = Offset(center.x + ringR * 0.9397f, center.y - ringR * 0.3420f))
         }
         // sound bars
         val base = floatArrayOf(0.30f, 0.55f, 0.80f, 0.55f, 0.30f)

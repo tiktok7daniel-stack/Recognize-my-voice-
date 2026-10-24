@@ -5,12 +5,12 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:pathData="M65,34.95 A22,22 0 1,1 43,34.95"
+        android:pathData="M74.67,46.48 A22,22 0 1,1 57.82,32.33"
         android:strokeWidth="8"
         android:strokeColor="#334FE3FF"
         android:strokeLineCap="round" />
     <path
-        android:pathData="M65,34.95 A22,22 0 1,1 43,34.95"
+        android:pathData="M74.67,46.48 A22,22 0 1,1 57.82,32.33"
         android:strokeWidth="3.6"
         android:strokeLineCap="round">
         <aapt:attr name="android:strokeColor">
@@ -24,7 +24,7 @@
     </path>
     <path
         android:fillColor="#FF4FE3FF"
-        android:pathData="M64.3,36.0 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" />
+        android:pathData="M74.67,46.48 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" />
     <path
         android:pathData="M42,51.2 L42,56.8 M48,47.4 L48,60.6 M54,43.6 L54,64.4 M60,47.4 L60,60.6 M66,51.2 L66,56.8"
         android:strokeWidth="3.6"

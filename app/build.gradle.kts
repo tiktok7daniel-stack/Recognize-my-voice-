@@ -19,6 +19,16 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Fixed signing key so every CI build installs as an update over the previous one.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

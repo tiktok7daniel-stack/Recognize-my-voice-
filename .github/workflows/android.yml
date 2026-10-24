@@ -53,13 +53,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "نبرة — آخر نسخة"
+          name: "Nabra — latest"
           target_commitish: ${{ github.sha }}
           prerelease: true
           make_latest: true
           overwrite_files: true
           body: |
-            آخر نسخة من نبرة (debug APK) — من الكوميت ${{ github.sha }}.
+            آخر نسخة من Nabra (debug APK) — من الكوميت ${{ github.sha }}.
             نزّل **Nabra.apk** وثبّته على موبايلك.
           files: out/Nabra.apk
 

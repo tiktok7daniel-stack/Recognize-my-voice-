@@ -146,6 +146,43 @@ fun SettingsScreen(
                     Text("قولها وبعدها الأمر، أو الاتنين مع بعض: \"${settings.wakeWord} افتح يوتيوب\"", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
                 }
 
+                SectionTitle("محرك فهم الأوامر")
+                GlassCard {
+                    Text("بعد كلمة التنبيه، الأمر نفسه بيتفهم بإيه؟", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(settings.commandEngine == "google", { scope.launch { c.settings.setCommandEngine("google") } },
+                            { Text("Google — دقة عالية") }, colors = chipColors())
+                        FilterChip(settings.commandEngine == "vosk", { scope.launch { c.settings.setCommandEngine("vosk") } },
+                            { Text("Vosk — أوفلاين 100%") }, colors = chipColors())
+                    }
+                    Text(
+                        if (c.google.isAvailable()) {
+                            "Google بيفهم المصري أدق بكتير وبيدّي كذا احتمال للكلمة. لو النت فاصل بيرجع للأوفلاين لوحده. " +
+                                "لو نزّلت حزمة العربي من إعدادات Google بيشتغل أوفلاين كمان."
+                        } else "خدمة Google للتعرف على الكلام مش موجودة على الموبايل ده — هيتستخدم Vosk.",
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp),
+                    )
+                    SettingSwitch("أوامري من غير كلمة التنبيه", "قول \"واحد\" على طول من غير \"${settings.wakeWord}\"", settings.directTriggers) { v ->
+                        scope.launch { c.settings.setDirectTriggers(v) }
+                    }
+                    SettingSwitch("الفقاعة العائمة", "زرار مايك صغير فوق كل التطبيقات — دوسة = قول أمر", settings.floatingBubble) { v ->
+                        if (v && !android.provider.Settings.canDrawOverlays(context)) {
+                            runCatching {
+                                context.startActivity(
+                                    com.daniel.assistant.ui.onboarding.Permissions.overlayIntent(context)
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        }
+                        scope.launch { c.settings.setFloatingBubble(v) }
+                    }
+                    Text(
+                        "طرق تانية سريعة: اسحب الإشعارات وضيف مربع \"Nabra\" للإعدادات السريعة، أو اضغط مطولًا على أيقونة التطبيق ← \"قول أمر\".",
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+
                 SectionTitle("الصوت والاستماع")
                 GlassCard {
                     SettingSwitch("الرد بالصوت (TTS)", "تأكيدات قصيرة زي \"حاضر\"", settings.ttsEnabled) { v -> scope.launch { c.settings.setTts(v) } }
@@ -241,14 +278,14 @@ fun SettingsScreen(
                 NavCard(Icons.Filled.History, "السجل", "الأوامر اللي اتنفذت والأخطاء", onOpenLogs)
 
                 SectionTitle("أخرى")
-                NavCard(Icons.Filled.School, "الشرح خطوة بخطوة", "إزاي نبرة بيشتغل وإزاي تعمل أول أمر", onOpenTutorial)
+                NavCard(Icons.Filled.School, "الشرح خطوة بخطوة", "إزاي Nabra بيشتغل وإزاي تعمل أول أمر", onOpenTutorial)
                 Spacer(Modifier.height(10.dp))
                 NavCard(Icons.Filled.Security, "الصلاحيات", "راجع الصلاحيات وإعدادات البطارية", onOpenPermissions)
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     NabraLogo(28.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("نبرة ${BuildConfig.VERSION_NAME} — للاستخدام الشخصي", style = MaterialTheme.typography.bodySmall)
+                    Text("Nabra ${BuildConfig.VERSION_NAME} — للاستخدام الشخصي", style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(110.dp))
             }

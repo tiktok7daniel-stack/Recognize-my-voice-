@@ -101,7 +101,7 @@ class Notifier(private val context: Context) {
         post(
             ID_ACCESSIBILITY,
             base(CH_ALERTS).setContentTitle("خدمة إمكانية الوصول مقفولة")
-                .setContentText("فعّل \"نبرة\" في إمكانية الوصول عشان أقدر أتحكم في الشاشة")
+                .setContentText("فعّل \"Nabra\" في إمكانية الوصول عشان أقدر أتحكم في الشاشة")
                 .setContentIntent(pi)
                 .setAutoCancel(true),
         )
@@ -120,7 +120,7 @@ class Notifier(private val context: Context) {
 
     fun bootPrompt() = post(
         ID_BOOT,
-        base(CH_ALERTS).setContentTitle("نبرة")
+        base(CH_ALERTS).setContentTitle("Nabra")
             .setContentText("اضغط هنا لتشغيل المساعد الصوتي")
             .setAutoCancel(true),
     )

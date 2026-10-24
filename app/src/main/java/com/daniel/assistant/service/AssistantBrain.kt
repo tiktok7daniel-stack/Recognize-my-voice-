@@ -20,11 +20,32 @@ class AssistantBrain(private val c: AppContainer) {
     private val _lastResult = MutableStateFlow("")
     val lastResult: StateFlow<String> = _lastResult.asStateFlow()
 
+    private val _listening = MutableStateFlow(false)
+    /** True while the accurate command recognizer is listening (after wake word / bubble / tile). */
+    val listening: StateFlow<Boolean> = _listening.asStateFlow()
+
+    private val _partial = MutableStateFlow("")
+    val partial: StateFlow<String> = _partial.asStateFlow()
+
     fun setHeard(text: String) { _lastHeard.value = text }
 
     fun cancelAll() {
         c.executor.cancel()
         c.ai.cancel()
+    }
+
+    suspend fun usesGoogle(): Boolean =
+        c.settings.current().commandEngine == "google" && c.google.isAvailable()
+
+    /** Phrases that bias the online recognizer toward things the user actually says. */
+    private suspend fun biasPhrases(): List<String> {
+        val out = mutableListOf<String>()
+        c.repo.all().filter { it.enabled }.forEach { out.addAll(it.triggers) }
+        SysAction.entries.forEach { out.addAll(it.phrases) }
+        c.appEntries().forEach { app ->
+            app.spokenNames.filter { ArabicNormalizer.isArabic(it) }.take(2).forEach { out.add("افتح $it") }
+        }
+        return out
     }
 
     private suspend fun waitSpeechEnd() {
@@ -33,22 +54,79 @@ class AssistantBrain(private val c: AppContainer) {
     }
 
     /**
+     * Listens for one command with the accurate recognizer and runs it.
+     * Returns false when that recognizer isn't enabled/available, so the caller can fall back
+     * to the offline listener's command window.
+     */
+    suspend fun listenForCommand(): Boolean {
+        if (!usesGoogle()) return false
+        _listening.value = true
+        _partial.value = ""
+        val alts = try {
+            c.voice.withMicReleased { c.google.capture(biasPhrases(), 9_000) { _partial.value = it } }
+        } finally {
+            _listening.value = false
+            _partial.value = ""
+        }
+        if (alts.isNullOrEmpty() && c.google.lastErrorIsHard) {
+            // Online recognizer unavailable (no network / busy / blocked) → offline fallback.
+            c.log.info("التعرف الأونلاين مش متاح (كود ${c.google.lastError}) — بستخدم الأوفلاين")
+            if (c.voice.loadModel()) {
+                _listening.value = true
+                val text = try {
+                    c.voice.captureOnce(null, 7_000) { _partial.value = it }
+                } finally {
+                    _listening.value = false; _partial.value = ""
+                }
+                if (!text.isNullOrBlank()) {
+                    handleAlternatives(listOf(text), grammarMode = false)
+                    return true
+                }
+            }
+        }
+        if (alts.isNullOrEmpty()) {
+            c.feedback.say("مسمعتش")
+            result("مسمعتش حاجة")
+            return true
+        }
+        handleAlternatives(alts, grammarMode = false)
+        return true
+    }
+
+    /** Captures free text (for "اكتب …", AI commands). */
+    private suspend fun captureFreeText(timeoutMs: Long): String? =
+        if (usesGoogle()) {
+            _listening.value = true
+            try {
+                c.voice.withMicReleased { c.google.capture(timeoutMs = timeoutMs) { _partial.value = it } }?.firstOrNull()
+            } finally {
+                _listening.value = false; _partial.value = ""
+            }
+        } else c.voice.captureOnce(null, timeoutMs)
+
+    suspend fun handle(heard: String, grammarMode: Boolean) = handleAlternatives(listOf(heard), grammarMode)
+
+    /**
      * @param grammarMode true when the recognizer is restricted to a grammar, so free text
      * (AI commands, "اكتب ...") must be captured again in free-form mode.
      */
-    suspend fun handle(heard: String, grammarMode: Boolean) {
-        _lastHeard.value = heard
+    suspend fun handleAlternatives(alternatives: List<String>, grammarMode: Boolean) {
         val s = c.settings.current()
         val resolver = CommandResolver(customThreshold = s.threshold.toDouble())
         val aiAvailable = c.ai.isAvailable()
-        val norm = ArabicNormalizer.normalize(heard)
+        val top = alternatives.firstOrNull().orEmpty()
+        val norm = ArabicNormalizer.normalize(top)
 
-        val res = if ((norm.isBlank() || norm == "[unk]") && grammarMode && aiAvailable) {
-            Resolution.Ai("")
+        val (heard, res) = if (alternatives.size == 1 && (norm.isBlank() || norm == "[unk]") && grammarMode && aiAvailable) {
+            top to Resolution.Ai("")
         } else {
-            resolver.resolve(heard, c.repo.all(), c.appEntries(), aiAvailable)
+            resolver.resolveBest(alternatives, c.repo.all(), c.appEntries(), aiAvailable)
         }
+        _lastHeard.value = heard.ifBlank { top }
+        execute(res, heard.ifBlank { top }, grammarMode)
+    }
 
+    private suspend fun execute(res: Resolution, heard: String, grammarMode: Boolean) {
         when (res) {
             is Resolution.Custom -> {
                 result("أمر: ${res.command.name}")
@@ -65,7 +143,7 @@ class AssistantBrain(private val c: AppContainer) {
             is Resolution.NeedsArg -> {
                 c.feedback.say(if (res.action == SysAction.CLICK) "أضغط على إيه؟" else "أكتب إيه؟")
                 waitSpeechEnd()
-                val arg = c.voice.captureOnce(null, 8_000)
+                val arg = captureFreeText(8_000)
                 if (arg.isNullOrBlank()) {
                     c.feedback.say("مسمعتش"); return
                 }
@@ -91,7 +169,7 @@ class AssistantBrain(private val c: AppContainer) {
                 if (grammarMode || command.isBlank()) {
                     c.feedback.say("قول الأمر")
                     waitSpeechEnd()
-                    command = c.voice.captureOnce(null, 9_000).orEmpty()
+                    command = captureFreeText(9_000).orEmpty()
                     if (command.isBlank()) {
                         c.feedback.say("مسمعتش"); return
                     }

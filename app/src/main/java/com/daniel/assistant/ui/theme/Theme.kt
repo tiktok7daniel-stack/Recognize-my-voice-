@@ -8,7 +8,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import com.daniel.assistant.R
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 
@@ -50,15 +53,39 @@ private val scheme = darkColorScheme(
     error = Neo.Danger,
 )
 
+val Tajawal = FontFamily(
+    Font(R.font.tajawal_regular, FontWeight.Normal),
+    Font(R.font.tajawal_medium, FontWeight.Medium),
+    Font(R.font.tajawal_bold, FontWeight.SemiBold),
+    Font(R.font.tajawal_bold, FontWeight.Bold),
+    Font(R.font.tajawal_extrabold, FontWeight.ExtraBold),
+)
+
+private val base = Typography()
+
+private fun TextStyle.t(size: Int? = null, weight: FontWeight? = null, color: Color? = null) = copy(
+    fontFamily = Tajawal,
+    fontSize = size?.sp ?: fontSize,
+    fontWeight = weight ?: fontWeight,
+    color = color ?: this.color,
+)
+
 private val typography = Typography(
-    displaySmall = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Neo.Text),
-    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Neo.Text),
-    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = Neo.Text),
-    titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Neo.Text),
-    bodyLarge = TextStyle(fontSize = 16.sp, color = Neo.Text),
-    bodyMedium = TextStyle(fontSize = 14.sp, color = Neo.Text),
-    bodySmall = TextStyle(fontSize = 12.sp, color = Neo.TextDim),
-    labelLarge = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+    displayLarge = base.displayLarge.t(weight = FontWeight.ExtraBold),
+    displayMedium = base.displayMedium.t(weight = FontWeight.ExtraBold),
+    displaySmall = base.displaySmall.t(34, FontWeight.ExtraBold, Neo.Text),
+    headlineLarge = base.headlineLarge.t(weight = FontWeight.Bold),
+    headlineMedium = base.headlineMedium.t(28, FontWeight.Bold, Neo.Text),
+    headlineSmall = base.headlineSmall.t(24, FontWeight.Bold, Neo.Text),
+    titleLarge = base.titleLarge.t(20, FontWeight.Bold, Neo.Text),
+    titleMedium = base.titleMedium.t(16, FontWeight.Bold, Neo.Text),
+    titleSmall = base.titleSmall.t(weight = FontWeight.Medium),
+    bodyLarge = base.bodyLarge.t(16, FontWeight.Normal, Neo.Text),
+    bodyMedium = base.bodyMedium.t(14, FontWeight.Normal, Neo.Text),
+    bodySmall = base.bodySmall.t(12, FontWeight.Normal, Neo.TextDim),
+    labelLarge = base.labelLarge.t(15, FontWeight.Bold),
+    labelMedium = base.labelMedium.t(weight = FontWeight.Medium),
+    labelSmall = base.labelSmall.t(weight = FontWeight.Medium),
 )
 
 @Composable

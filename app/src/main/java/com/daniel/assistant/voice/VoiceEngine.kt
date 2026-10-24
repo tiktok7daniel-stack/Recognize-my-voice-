@@ -132,6 +132,19 @@ class VoiceEngine(private val models: ModelManager) {
             result
         }
 
+    /**
+     * Stops the continuous listener so another recognizer (e.g. Google) can use the
+     * microphone, runs [block], then restores continuous listening.
+     */
+    suspend fun <T> withMicReleased(block: suspend () -> T): T = mutex.withLock {
+        stopInternal()
+        try {
+            block()
+        } finally {
+            continuous?.let { startInternal(it) }
+        }
+    }
+
     fun release() {
         stopInternal()
         continuous = null
@@ -195,8 +208,10 @@ class VoiceEngine(private val models: ModelManager) {
         _listening.value = false
     }
 
-    private fun parse(json: String?, key: String): String =
-        runCatching { JSONObject(json ?: "{}").optString(key, "") }.getOrDefault("").trim()
+    private fun parse(json: String?, key: String): String {
+        val raw = runCatching { JSONObject(json ?: "{}").optString(key, "") }.getOrDefault("").trim()
+        return ArabicNormalizer.fromBuckwalterIfNeeded(raw)
+    }
 
     companion object {
         private const val TAG = "VoiceEngine"

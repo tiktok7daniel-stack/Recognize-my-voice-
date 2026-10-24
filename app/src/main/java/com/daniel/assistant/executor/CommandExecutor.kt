@@ -67,14 +67,11 @@ class CommandExecutor(
         _running.value = name
         log.info("تشغيل \"$name\" (${steps.size} خطوات)")
         try {
-            if (steps.any { it.needsAccessibility } && AssistantAccessibilityService.get() == null) {
-                notifier.accessibilityDisabled()
-                feedback.say("فعّل خدمة إمكانية الوصول الأول")
-                log.error("\"$name\": خدمة إمكانية الوصول مقفولة")
-                return false
-            }
             steps.forEachIndexed { i, step ->
-                val error = runStep(step)
+                val error = if (step.needsAccessibility && service() == null) {
+                    notifier.accessibilityDisabled()
+                    "خدمة إمكانية الوصول مقفولة — فعّلها من الإعدادات"
+                } else runStep(step)
                 if (error != null) {
                     feedback.errorCue()
                     feedback.say("حصلت مشكلة في خطوة ${i + 1}")

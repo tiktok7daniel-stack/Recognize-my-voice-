@@ -128,3 +128,33 @@ class ImportExportTest {
         assertEquals("اكس", back.aliases.single().alias)
     }
 }
+
+class RecognitionUpgradeTest {
+    private val resolver = CommandResolver()
+    private val apps = listOf(AppEntry("Claude", "com.anthropic.claude"), AppEntry("YouTube", "com.google.android.youtube"))
+    private val one = CustomCommand(id = 1, name = "واحد", triggers = listOf("واحد"), steps = listOf(Step.Home))
+
+    @Test fun shortTriggerInsideShortUtterance() {
+        assertTrue(resolver.resolve("يا واحد", listOf(one), apps, false) is Resolution.Custom)
+        assertTrue(resolver.resolve("واحد بس", listOf(one), apps, false) is Resolution.Custom)
+        assertTrue(resolver.resolve("انا عايز واحد شاي كبير دلوقتي", listOf(one), apps, false) !is Resolution.Custom)
+    }
+
+    @Test fun picksBestAlternative() {
+        val (text, r) = resolver.resolveBest(listOf("وحيد", "واحد", "وأحد"), listOf(one), apps, aiAvailable = true)
+        assertEquals("واحد", text)
+        assertTrue(r is Resolution.Custom)
+        val (t2, r2) = resolver.resolveBest(listOf("افتح يوتيوب", "افتح يو تيوب"), listOf(one), apps, false)
+        assertEquals("افتح يوتيوب", t2)
+        assertTrue(r2 is Resolution.OpenApp)
+        val (_, r3) = resolver.resolveBest(listOf("ابعت رسالة لاحمد"), emptyList(), apps, aiAvailable = true)
+        assertTrue(r3 is Resolution.Ai)
+    }
+
+    @Test fun buckwalterOutputIsConverted() {
+        assertEquals("واحد", ArabicNormalizer.fromBuckwalterIfNeeded("wAHd"))
+        assertEquals("يا مساعد", ArabicNormalizer.fromBuckwalterIfNeeded("yA msAEd"))
+        assertEquals("واحد", ArabicNormalizer.fromBuckwalterIfNeeded("واحد"))
+        assertEquals("[unk]", ArabicNormalizer.fromBuckwalterIfNeeded("[unk]"))
+    }
+}

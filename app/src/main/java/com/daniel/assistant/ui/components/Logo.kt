@@ -33,7 +33,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * The "نبرة" logo: a glowing cyan voice ring around five sound-wave bars.
+ * The "Nabra" logo: a glowing cyan voice ring around five sound-wave bars.
  * [ringProgress] (0..1) draws the ring, [wavePhase] animates the bars.
  */
 @Composable
@@ -104,7 +104,7 @@ enum class OrbState { OFF, IDLE, AWAITING, PAUSED }
 
 /** Big glowing orb on the home screen showing the listening state. */
 @Composable
-fun GlowOrb(state: OrbState, size: Dp = 220.dp, onClick: () -> Unit) {
+fun GlowOrb(state: OrbState, size: Dp = 220.dp, level: Float = 0f, onClick: () -> Unit) {
     val t = rememberInfiniteTransition(label = "orb")
     val rot by t.animateFloat(0f, 360f, infiniteRepeatable(tween(if (state == OrbState.AWAITING) 1200 else 4000, easing = LinearEasing)), label = "rot")
     val pulse by t.animateFloat(0.92f, 1.06f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
@@ -119,7 +119,7 @@ fun GlowOrb(state: OrbState, size: Dp = 220.dp, onClick: () -> Unit) {
         Canvas(Modifier.size(size)) {
             val s = this.size.minDimension
             val c = Offset(s / 2, s / 2)
-            val scale = if (state == OrbState.AWAITING) pulse else 1f
+            val scale = if (state == OrbState.AWAITING) maxOf(pulse, 0.95f + level * 0.25f) else 1f
             drawCircle(
                 Brush.radialGradient(listOf(ringColor.copy(alpha = 0.35f), Color.Transparent), c, s * 0.5f * scale),
                 radius = s * 0.5f * scale, center = c,

@@ -1,11 +1,11 @@
-# نبرة (Nabra): personal voice assistant for Android
+# Nabra: personal voice assistant for Android
 
 A private Android app (Kotlin + Jetpack Compose) that controls the whole phone by
 voice in **Egyptian Arabic**. Speech recognition runs **offline** on the phone (Vosk).
 You build your own commands: say one word, and the app runs a chain of actions.
 
 > Example: say **"يا مساعد … واحد"**. Nabra sends your last 2 photos to Claude,
-> waits, types **"حلهم"**, and presses **Send**.
+> waits, types **"حلهم بالترتيب بالإيطالي"**, and presses **Send**.
 
 Personal use only. Not for Google Play (it uses `QUERY_ALL_PACKAGES` and an
 AccessibilityService that controls other apps).
@@ -67,6 +67,21 @@ There is no official Egyptian Vosk model. Nabra makes up for it in two ways:
   tatweel, maps أ/إ/آ → ا, ة → ه, ى → ي, and converts Arabic digits.
 
 You can pick a model or paste a custom zip URL in *Settings → Voice model*.
+
+## Recognition engines
+
+* **Wake word**: always Vosk, offline and on the phone.
+* **The command itself** (choose in *Settings → Command engine*):
+  * **Google** (default): Android's speech recognizer in `ar-EG`. It returns up to 5
+    alternatives, and Nabra picks the first one that matches a real command. On Android 13+
+    it is biased toward your own triggers and app names. If it fails (no network, busy,
+    blocked), Nabra falls back to Vosk automatically.
+  * **Vosk**: 100% offline.
+* **Direct triggers**: your own triggers (for example "واحد") also work without the wake word.
+  You can turn this off in Settings.
+* **Faster ways to give a command**: the "قول أمر دلوقتي" button on Home, a draggable
+  **floating mic bubble** over all apps, a **Quick Settings tile**, and a long-press
+  **app-icon shortcut**.
 
 ## How it works
 

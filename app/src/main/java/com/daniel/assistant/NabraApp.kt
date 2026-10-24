@@ -13,6 +13,7 @@ import com.daniel.assistant.executor.CommandExecutor
 import com.daniel.assistant.service.AssistantBrain
 import com.daniel.assistant.service.Notifier
 import com.daniel.assistant.voice.Feedback
+import com.daniel.assistant.voice.GoogleRecognizer
 import com.daniel.assistant.voice.ModelManager
 import com.daniel.assistant.voice.VoiceEngine
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +47,7 @@ class AppContainer(val app: Application) {
     val feedback = Feedback(app)
     val models = ModelManager(app, scope)
     val voice = VoiceEngine(models)
+    val google = GoogleRecognizer(app)
 
     val executor = CommandExecutor(app, appIndex, feedback, notifier, log, scope, ::appEntries)
     val ai = AiAgent(app, settings, feedback, notifier, log, voice, executor, scope, ::appEntries)

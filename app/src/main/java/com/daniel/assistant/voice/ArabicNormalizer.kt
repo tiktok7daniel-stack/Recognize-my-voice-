@@ -43,4 +43,26 @@ object ArabicNormalizer {
         spaces.replace(diacritics.replace(input, ""), " ").trim().lowercase()
 
     fun isArabic(text: String): Boolean = text.any { it in '؀'..'ۿ' }
+
+    private val buckwalter = mapOf(
+        '\'' to "ء", '|' to "آ", '>' to "أ", '&' to "ؤ", '<' to "إ", '}' to "ئ", 'A' to "ا", 'b' to "ب",
+        'p' to "ة", 't' to "ت", 'v' to "ث", 'j' to "ج", 'H' to "ح", 'x' to "خ", 'd' to "د", '*' to "ذ",
+        'r' to "ر", 'z' to "ز", 's' to "س", '$' to "ش", 'S' to "ص", 'D' to "ض", 'T' to "ط", 'Z' to "ظ",
+        'E' to "ع", 'g' to "غ", 'f' to "ف", 'q' to "ق", 'k' to "ك", 'l' to "ل", 'm' to "م", 'n' to "ن",
+        'h' to "ه", 'w' to "و", 'Y' to "ى", 'y' to "ي", '{' to "ا",
+        // short vowels / shadda / sukun are dropped
+        'F' to "", 'N' to "", 'K' to "", 'a' to "", 'u' to "", 'i' to "", '~' to "", 'o' to "", '`' to "", '_' to "",
+    )
+    private val buckwalterSpecial = Regex("[|><&}*$'{~`]|[A-Z]")
+
+    /**
+     * Some Kaldi Arabic models output Buckwalter transliteration ("wAHd") instead of Arabic
+     * script. Converts such output to Arabic so it can be matched; other text is returned as is.
+     */
+    fun fromBuckwalterIfNeeded(text: String): String {
+        if (text.isBlank() || isArabic(text) || text.contains("[unk]")) return text
+        if (!buckwalterSpecial.containsMatchIn(text)) return text
+        if (text.any { it !in buckwalter && it != ' ' && !it.isDigit() }) return text
+        return text.split(' ').joinToString(" ") { w -> w.map { buckwalter[it] ?: it.toString() }.joinToString("") }
+    }
 }

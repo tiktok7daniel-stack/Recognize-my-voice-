@@ -65,7 +65,7 @@ fun IntroScreen(onFinished: () -> Unit) {
             )
             Spacer(Modifier.height(28.dp))
             Text(
-                "نَبْرة",
+                "Nabra",
                 fontSize = 44.sp,
                 fontWeight = FontWeight.Bold,
                 color = Neo.Text,

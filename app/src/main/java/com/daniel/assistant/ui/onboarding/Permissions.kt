@@ -70,7 +70,7 @@ object Permissions {
                     comp("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"),
                     comp("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"),
                 ),
-                "من البطارية: شيل نبرة من \"التطبيقات النايمة\" وحطه في \"التطبيقات اللي مش بتنام\".",
+                "من البطارية: شيل Nabra من \"التطبيقات النايمة\" وحطه في \"التطبيقات اللي مش بتنام\".",
             )
             m.contains("huawei") || m.contains("honor") -> OemInfo(
                 "Huawei",
@@ -78,7 +78,7 @@ object Permissions {
                     comp("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
                     comp("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
                 ),
-                "من تشغيل التطبيقات: خلي نبرة \"إدارة يدوية\" وفعّل كل الاختيارات.",
+                "من تشغيل التطبيقات: خلي Nabra \"إدارة يدوية\" وفعّل كل الاختيارات.",
             )
             m.contains("oppo") || m.contains("realme") || m.contains("oneplus") -> OemInfo(
                 Build.MANUFACTURER,

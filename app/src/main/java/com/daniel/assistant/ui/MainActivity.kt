@@ -56,6 +56,21 @@ import com.daniel.assistant.ui.tutorial.TutorialScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleListenIntent(intent)
+    }
+
+    /** Shortcut / tile: start listening for one command and get out of the way. */
+    private fun handleListenIntent(intent: android.content.Intent?) {
+        if (intent?.action != com.daniel.assistant.service.ListeningService.ACTION_LISTEN_NOW) return
+        if (!com.daniel.assistant.ui.onboarding.Permissions.mic(this)) return
+        com.daniel.assistant.service.ListeningService.listenNow(this)
+        intent.action = null
+        moveTaskToBack(true)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge(
@@ -63,6 +78,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        handleListenIntent(intent)
         setContent {
             NabraTheme {
                 Box(Modifier.fillMaxSize().background(Neo.Bg0)) { NabraNav() }
@@ -174,6 +190,14 @@ private fun NabraNav() {
                     onOpenPermissions = { nav.navigate(Routes.PERMISSIONS) },
                     onOpenModel = { nav.navigate(Routes.MODEL) },
                     onOpenTutorial = { nav.navigate(Routes.TUTORIAL) },
+                    onNewCommand = { nav.navigate(Routes.editor(null)) },
+                    onOpenCommands = {
+                        nav.navigate(Routes.COMMANDS) {
+                            popUpTo(Routes.HOME) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Routes.COMMANDS) {

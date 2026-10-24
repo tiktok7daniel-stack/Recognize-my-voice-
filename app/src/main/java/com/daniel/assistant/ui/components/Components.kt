@@ -1,6 +1,13 @@
 package com.daniel.assistant.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,18 +57,35 @@ import com.daniel.assistant.ui.theme.Neo
 
 @Composable
 fun NabraBackground(content: @Composable BoxScope.() -> Unit) {
+    val t = rememberInfiniteTransition(label = "bg")
+    val drift by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14_000, easing = LinearEasing), RepeatMode.Reverse), label = "drift")
     Box(
         Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Neo.Bg1, Neo.Bg0, Color(0xFF07090D))))
     ) {
-        // soft accent glow in the corner, like the reference kit
-        Box(
-            Modifier
-                .size(420.dp)
-                .align(Alignment.TopStart)
-                .background(Brush.radialGradient(listOf(Neo.Accent.copy(alpha = 0.16f), Color.Transparent)))
-        )
+        // two slowly drifting glows (accent + cyan), like the reference kit
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width; val h = size.height
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Neo.Accent.copy(alpha = 0.20f), Color.Transparent),
+                    center = Offset(w * (0.15f + 0.25f * drift), h * (0.10f + 0.08f * drift)),
+                    radius = w * 0.75f,
+                ),
+                radius = w * 0.75f,
+                center = Offset(w * (0.15f + 0.25f * drift), h * (0.10f + 0.08f * drift)),
+            )
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(Neo.Cyan.copy(alpha = 0.10f), Color.Transparent),
+                    center = Offset(w * (0.95f - 0.3f * drift), h * (0.75f - 0.1f * drift)),
+                    radius = w * 0.65f,
+                ),
+                radius = w * 0.65f,
+                center = Offset(w * (0.95f - 0.3f * drift), h * (0.75f - 0.1f * drift)),
+            )
+        }
         content()
     }
 }

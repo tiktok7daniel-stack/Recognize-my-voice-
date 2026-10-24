@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_mic"
+        android:shortcutId="listen_now"
+        android:shortcutLongLabel="@string/shortcut_listen_long"
+        android:shortcutShortLabel="@string/shortcut_listen">
+        <intent
+            android:action="com.daniel.assistant.LISTEN_NOW"
+            android:targetClass="com.daniel.assistant.ui.MainActivity"
+            android:targetPackage="com.daniel.assistant" />
+    </shortcut>
+</shortcuts>

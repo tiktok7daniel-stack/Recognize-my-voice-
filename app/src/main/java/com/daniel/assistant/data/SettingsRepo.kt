@@ -36,6 +36,12 @@ data class AppSettings(
     val threshold: Float = 0.80f,
     val modelUrl: String = VoskModels.DEFAULT.url,
     val demoSeeded: Boolean = false,
+    val demoTextV2: Boolean = false,
+    /** "google" (Android speech, most accurate for Egyptian Arabic) or "vosk" (fully offline). */
+    val commandEngine: String = "google",
+    /** Run custom command triggers even without the wake word. */
+    val directTriggers: Boolean = true,
+    val floatingBubble: Boolean = false,
     val aiEnabled: Boolean = false,
     val aiProvider: String = "anthropic",
     val aiModel: String = AiDefaults.ANTHROPIC_MODEL,
@@ -59,6 +65,10 @@ class SettingsRepo(private val context: Context) {
         val threshold = floatPreferencesKey("threshold")
         val modelUrl = stringPreferencesKey("model_url")
         val demoSeeded = booleanPreferencesKey("demo_seeded")
+        val demoTextV2 = booleanPreferencesKey("demo_text_v2")
+        val engine = stringPreferencesKey("command_engine")
+        val direct = booleanPreferencesKey("direct_triggers")
+        val bubble = booleanPreferencesKey("floating_bubble")
         val aiEnabled = booleanPreferencesKey("ai_enabled")
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiModel = stringPreferencesKey("ai_model")
@@ -82,6 +92,10 @@ class SettingsRepo(private val context: Context) {
             threshold = p[K.threshold] ?: d.threshold,
             modelUrl = p[K.modelUrl]?.takeIf { it.isNotBlank() } ?: d.modelUrl,
             demoSeeded = p[K.demoSeeded] ?: d.demoSeeded,
+            demoTextV2 = p[K.demoTextV2] ?: d.demoTextV2,
+            commandEngine = p[K.engine] ?: d.commandEngine,
+            directTriggers = p[K.direct] ?: d.directTriggers,
+            floatingBubble = p[K.bubble] ?: d.floatingBubble,
             aiEnabled = p[K.aiEnabled] ?: d.aiEnabled,
             aiProvider = p[K.aiProvider] ?: d.aiProvider,
             aiModel = p[K.aiModel]?.takeIf { it.isNotBlank() } ?: d.aiModel,
@@ -109,6 +123,10 @@ class SettingsRepo(private val context: Context) {
     suspend fun setThreshold(v: Float) = edit { it[K.threshold] = v }
     suspend fun setModelUrl(v: String) = edit { it[K.modelUrl] = v.trim() }
     suspend fun setDemoSeeded(v: Boolean) = edit { it[K.demoSeeded] = v }
+    suspend fun setDemoTextV2(v: Boolean) = edit { it[K.demoTextV2] = v }
+    suspend fun setCommandEngine(v: String) = edit { it[K.engine] = v }
+    suspend fun setDirectTriggers(v: Boolean) = edit { it[K.direct] = v }
+    suspend fun setFloatingBubble(v: Boolean) = edit { it[K.bubble] = v }
     suspend fun setAiEnabled(v: Boolean) = edit { it[K.aiEnabled] = v }
     suspend fun setAiProvider(v: String) = edit { it[K.aiProvider] = v }
     suspend fun setAiModel(v: String) = edit { it[K.aiModel] = v.trim() }

@@ -59,6 +59,7 @@ class ListeningService : Service() {
         const val ACTION_PAUSE = "com.daniel.assistant.PAUSE"
         const val ACTION_RESUME = "com.daniel.assistant.RESUME"
         const val ACTION_STOP = "com.daniel.assistant.STOP"
+        const val ACTION_LISTEN_NOW = "com.daniel.assistant.LISTEN_NOW"
         private const val COMMAND_WINDOW_MS = 6_500L
 
         private val _state = MutableStateFlow(State())
@@ -67,6 +68,13 @@ class ListeningService : Service() {
         fun start(context: Context) {
             ContextCompat.startForegroundService(
                 context, Intent(context, ListeningService::class.java).setAction(ACTION_START)
+            )
+        }
+
+        /** Start (if needed) and immediately listen for one command, no wake word. */
+        fun listenNow(context: Context) {
+            ContextCompat.startForegroundService(
+                context, Intent(context, ListeningService::class.java).setAction(ACTION_LISTEN_NOW)
             )
         }
 
@@ -85,6 +93,11 @@ class ListeningService : Service() {
     private var speaking = false
     private var wakeWord = ""
     private var pauseOnScreenOff = true
+    private var directTriggers = true
+    private var cachedCommands: List<com.daniel.assistant.commands.CustomCommand> = emptyList()
+    private var pendingListenNow = false
+    private var modelReady = false
+    private lateinit var bubble: FloatingBubble
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -104,6 +117,7 @@ class ListeningService : Service() {
     override fun onCreate() {
         super.onCreate()
         c = (application as NabraApp).container
+        bubble = FloatingBubble(this) { listenNowInternal() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -114,11 +128,15 @@ class ListeningService : Service() {
             }
             ACTION_PAUSE -> { userPaused = true; applyPause() }
             ACTION_RESUME -> { userPaused = false; applyPause() }
+            ACTION_LISTEN_NOW -> pendingListenNow = true
         }
         if (!goForeground()) return START_NOT_STICKY
         if (!started) {
             started = true
             begin()
+        } else if (pendingListenNow && modelReady) {
+            pendingListenNow = false
+            listenNowInternal()
         }
         return START_STICKY
     }
@@ -152,7 +170,12 @@ class ListeningService : Service() {
 
         scope.launch {
             if (!c.voice.loadModel()) {
-                c.notifier.info("موديل الصوت مش موجود", "افتح نبرة ونزّل موديل التعرف على الصوت")
+                if (pendingListenNow) {
+                    pendingListenNow = false
+                    c.feedback.cue()
+                    c.brain.listenForCommand()
+                }
+                c.notifier.info("موديل الصوت مش موجود", "افتح Nabra ونزّل موديل التعرف على الصوت")
                 _state.value = State(error = "الموديل مش موجود")
                 stopEverything()
                 return@launch
@@ -163,6 +186,15 @@ class ListeningService : Service() {
             launch {
                 c.feedback.speaking.collect { speaking = it; applyPause() }
             }
+            launch {
+                c.settings.flow.map { it.floatingBubble to it.directTriggers }.distinctUntilChanged().collect { (b, d) ->
+                    directTriggers = d
+                    if (b) bubble.show() else bubble.hide()
+                }
+            }
+            launch {
+                combine(c.brain.listening, state) { l, st -> l || st.awaitingCommand }.collect { bubble.setActive(it) }
+            }
 
             val settingsKey = c.settings.flow
                 .map { Triple(it.wakeWord, it.useGrammar, it.pauseOnScreenOff) }
@@ -170,13 +202,56 @@ class ListeningService : Service() {
             combine(c.repo.commands, c.appEntriesFlow, settingsKey) { cmds, apps, s -> Triple(cmds, apps, s) }
                 .debounce(500)
                 .collectLatest { (cmds, apps, s) ->
+                    cachedCommands = cmds
                     wakeWord = s.first
                     pauseOnScreenOff = s.third
                     val grammar = if (s.second && c.voice.supportsGrammar()) {
                         GrammarBuilder.toJson(GrammarBuilder.phrases(s.first, cmds, apps))
                     } else null
                     startListening(grammar)
+                    modelReady = true
+                    if (pendingListenNow) {
+                        pendingListenNow = false
+                        listenNowInternal()
+                    }
                 }
+        }
+    }
+
+    /** Listen for one command right now (bubble, tile, shortcut, Home button). */
+    private fun listenNowInternal() {
+        if (c.executor.running.value != null || c.ai.running.value) return
+        endWindow()
+        startCommandCapture()
+    }
+
+    /** After the wake word: accurate recognizer if enabled, otherwise the offline command window. */
+    private fun startCommandCapture() {
+        c.feedback.cue()
+        listenJob?.cancel()
+        listenJob = scope.launch {
+            if (!c.brain.listenForCommand()) openVoskWindow()
+        }
+    }
+
+    private fun openVoskWindow() {
+        _state.value = _state.value.copy(awaitingCommand = true)
+        updateNotification()
+        windowJob?.cancel()
+        windowJob = scope.launch {
+            delay(COMMAND_WINDOW_MS)
+            endWindow()
+        }
+    }
+
+    /** True when the whole utterance is (almost exactly) one of the user's triggers. */
+    private fun isDirectTrigger(text: String): Boolean {
+        if (!directTriggers) return false
+        return cachedCommands.any { cmd ->
+            cmd.enabled && cmd.triggers.any { t ->
+                val n = ArabicNormalizer.normalize(t)
+                n.isNotBlank() && (text == n || FuzzyMatcher.ratio(text, n) >= 0.85)
+            }
         }
     }
 
@@ -219,19 +294,20 @@ class ListeningService : Service() {
             return
         }
 
-        val rest = afterWakeWord(text) ?: return
+        val rest = afterWakeWord(text)
+        if (rest == null) {
+            // Custom triggers like "واحد" work even without the wake word.
+            if (isDirectTrigger(text)) {
+                c.brain.setHeard(raw)
+                dispatch(raw)
+            }
+            return
+        }
         c.brain.setHeard(raw)
         if (rest.isNotBlank() && rest != "[unk]") {
             dispatch(rest)
         } else {
-            c.feedback.cue()
-            _state.value = _state.value.copy(awaitingCommand = true)
-            updateNotification()
-            windowJob?.cancel()
-            windowJob = scope.launch {
-                delay(COMMAND_WINDOW_MS)
-                endWindow()
-            }
+            startCommandCapture()
         }
     }
 
@@ -290,7 +366,7 @@ class ListeningService : Service() {
         return NotificationCompat.Builder(this, Notifier.CH_LISTEN)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(0xFF3D7BFF.toInt())
-            .setContentTitle("نبرة")
+            .setContentTitle("Nabra")
             .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
@@ -309,6 +385,7 @@ class ListeningService : Service() {
     }
 
     private fun stopEverything() {
+        bubble.hide()
         if (started) {
             runCatching { unregisterReceiver(screenReceiver) }
             runCatching { unregisterReceiver(packageReceiver) }

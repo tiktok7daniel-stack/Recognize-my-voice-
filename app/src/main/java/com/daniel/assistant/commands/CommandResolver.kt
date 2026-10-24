@@ -62,7 +62,40 @@ class CommandResolver(
                 }
             }
         }
+        // Short utterances that contain a trigger as a whole word ("يا واحد", "واحد بس")
+        if ((best == null || bestScore < customThreshold) && text.split(' ').size <= 3) {
+            val words = text.split(' ')
+            for (c in commands) {
+                if (!c.enabled) continue
+                if (c.triggers.any { t -> ArabicNormalizer.normalize(t).let { n -> n.isNotBlank() && !n.contains(' ') && n in words } }) {
+                    return Resolution.Custom(c, 0.9)
+                }
+            }
+        }
         return if (best != null && bestScore >= customThreshold) Resolution.Custom(best, bestScore) else null
+    }
+
+    /**
+     * Resolves several recognition alternatives (e.g. Google's n-best list) and returns the
+     * first one that maps to a concrete action, falling back to AI / unknown for the top one.
+     */
+    fun resolveBest(
+        alternatives: List<String>,
+        commands: List<CustomCommand>,
+        apps: List<AppEntry>,
+        aiAvailable: Boolean,
+    ): Pair<String, Resolution> {
+        val alts = alternatives.filter { it.isNotBlank() }
+        if (alts.isEmpty()) return "" to Resolution.Unknown("")
+        val resolved = alts.map { it to resolve(it, commands, apps, aiAvailable = false) }
+        resolved.firstOrNull { it.second is Resolution.Custom }?.let { return it }
+        resolved.firstOrNull { it.second is Resolution.Cancel }?.let { return it }
+        resolved.firstOrNull {
+            it.second !is Resolution.Unknown && it.second !is Resolution.OpenAppUnknown
+        }?.let { return it }
+        resolved.firstOrNull { it.second is Resolution.OpenAppUnknown }?.let { return it }
+        val top = alts.first()
+        return top to (if (aiAvailable) Resolution.Ai(top) else Resolution.Unknown(top))
     }
 
     fun matchSystem(text: String): Resolution? {

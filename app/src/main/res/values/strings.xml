@@ -1,4 +1,6 @@
 <resources>
-    <string name="app_name">نبرة</string>
-    <string name="a11y_description">نبرة بتستخدم إمكانية الوصول عشان تنفذ أوامرك الصوتية: تفتح التطبيقات، تضغط على الأزرار، تكتب، تعمل سكرول وترجع. مفيش أي بيانات بتتبعت برّه الجهاز إلا لو فعّلت وضع الذكاء الاصطناعي بنفسك.</string>
+    <string name="app_name">Nabra</string>
+    <string name="shortcut_listen">قول أمر</string>
+    <string name="shortcut_listen_long">قول أمر لـ Nabra</string>
+    <string name="a11y_description">Nabra بيستخدم إمكانية الوصول عشان تنفذ أوامرك الصوتية: تفتح التطبيقات، تضغط على الأزرار، تكتب، تعمل سكرول وترجع. مفيش أي بيانات بتتبعت برّه الجهاز إلا لو فعّلت وضع الذكاء الاصطناعي بنفسك.</string>
 </resources>

@@ -1,0 +1,328 @@
+package com.daniel.assistant.service
+
+import android.app.Notification
+import android.app.PendingIntent
+import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
+import com.daniel.assistant.AppContainer
+import com.daniel.assistant.NabraApp
+import com.daniel.assistant.R
+import com.daniel.assistant.commands.SysAction
+import com.daniel.assistant.ui.MainActivity
+import com.daniel.assistant.voice.ArabicNormalizer
+import com.daniel.assistant.voice.FuzzyMatcher
+import com.daniel.assistant.voice.GrammarBuilder
+import com.daniel.assistant.voice.VoiceEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+/**
+ * Foreground service (type=microphone) that keeps Vosk listening for the wake word,
+ * opens a ~6 s command window and hands commands to [AssistantBrain].
+ */
+class ListeningService : Service() {
+
+    data class State(
+        val running: Boolean = false,
+        val paused: Boolean = false,
+        val awaitingCommand: Boolean = false,
+        val grammarMode: Boolean = false,
+        val partial: String = "",
+        val error: String? = null,
+    )
+
+    companion object {
+        const val ACTION_START = "com.daniel.assistant.START"
+        const val ACTION_PAUSE = "com.daniel.assistant.PAUSE"
+        const val ACTION_RESUME = "com.daniel.assistant.RESUME"
+        const val ACTION_STOP = "com.daniel.assistant.STOP"
+        private const val COMMAND_WINDOW_MS = 6_500L
+
+        private val _state = MutableStateFlow(State())
+        val state: StateFlow<State> = _state.asStateFlow()
+
+        fun start(context: Context) {
+            ContextCompat.startForegroundService(
+                context, Intent(context, ListeningService::class.java).setAction(ACTION_START)
+            )
+        }
+
+        fun stop(context: Context) {
+            context.startService(Intent(context, ListeningService::class.java).setAction(ACTION_STOP))
+        }
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private lateinit var c: AppContainer
+    private var started = false
+    private var listenJob: Job? = null
+    private var windowJob: Job? = null
+    private var userPaused = false
+    private var screenOff = false
+    private var speaking = false
+    private var wakeWord = ""
+    private var pauseOnScreenOff = true
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            screenOff = intent.action == Intent.ACTION_SCREEN_OFF
+            applyPause()
+        }
+    }
+
+    private val packageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            scope.launch { c.appIndex.refresh() }
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        c = (application as NabraApp).container
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopEverything()
+                return START_NOT_STICKY
+            }
+            ACTION_PAUSE -> { userPaused = true; applyPause() }
+            ACTION_RESUME -> { userPaused = false; applyPause() }
+        }
+        if (!goForeground()) return START_NOT_STICKY
+        if (!started) {
+            started = true
+            begin()
+        }
+        return START_STICKY
+    }
+
+    private fun goForeground(): Boolean = try {
+        val type = if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        ServiceCompat.startForeground(this, Notifier.ID_SERVICE, buildNotification(), type)
+        true
+    } catch (e: Exception) {
+        // e.g. Android 14+ refuses a microphone FGS started from the background / boot.
+        c.notifier.bootPrompt()
+        c.log.error("مقدرتش أشغل خدمة الاستماع: ${e.message}")
+        stopSelf()
+        false
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun begin() {
+        _state.value = State(running = true)
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_SCREEN_ON)
+        }
+        ContextCompat.registerReceiver(this, screenReceiver, screenFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        val pkgFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        ContextCompat.registerReceiver(this, packageReceiver, pkgFilter, ContextCompat.RECEIVER_EXPORTED)
+
+        scope.launch {
+            if (!c.voice.loadModel()) {
+                c.notifier.info("موديل الصوت مش موجود", "افتح نبرة ونزّل موديل التعرف على الصوت")
+                _state.value = State(error = "الموديل مش موجود")
+                stopEverything()
+                return@launch
+            }
+            c.feedback.warmUp()
+            c.log.info("المساعد بدأ يسمع")
+
+            launch {
+                c.feedback.speaking.collect { speaking = it; applyPause() }
+            }
+
+            val settingsKey = c.settings.flow
+                .map { Triple(it.wakeWord, it.useGrammar, it.pauseOnScreenOff) }
+                .distinctUntilChanged()
+            combine(c.repo.commands, c.appEntriesFlow, settingsKey) { cmds, apps, s -> Triple(cmds, apps, s) }
+                .debounce(500)
+                .collectLatest { (cmds, apps, s) ->
+                    wakeWord = s.first
+                    pauseOnScreenOff = s.third
+                    val grammar = if (s.second && c.voice.supportsGrammar()) {
+                        GrammarBuilder.toJson(GrammarBuilder.phrases(s.first, cmds, apps))
+                    } else null
+                    startListening(grammar)
+                }
+        }
+    }
+
+    private suspend fun startListening(grammar: String?) {
+        c.voice.startContinuous(
+            VoiceEngine.Continuous(
+                grammar = grammar,
+                onResult = ::onResult,
+                onPartial = { p -> _state.value = _state.value.copy(partial = p) },
+                onError = { e ->
+                    c.log.error("خطأ في الميكروفون: ${e.message}")
+                    scope.launch {
+                        delay(2_000)
+                        startListening(grammar)
+                    }
+                },
+            )
+        )
+        _state.value = _state.value.copy(running = true, grammarMode = c.voice.grammarActive, error = null)
+        applyPause()
+    }
+
+    private fun onResult(raw: String) {
+        val text = ArabicNormalizer.normalize(raw)
+        _state.value = _state.value.copy(partial = "")
+        if (text.isBlank() || text == "[unk]" && !_state.value.awaitingCommand) return
+
+        // While a command or AI task runs, only listen for "وقف".
+        if (c.executor.running.value != null || c.ai.running.value) {
+            if (SysAction.CANCEL_WORDS.any { ArabicNormalizer.normalize(it) == text }) {
+                c.brain.cancelAll()
+                c.feedback.say("وقفت")
+            }
+            return
+        }
+
+        if (_state.value.awaitingCommand) {
+            endWindow()
+            dispatch(raw)
+            return
+        }
+
+        val rest = afterWakeWord(text) ?: return
+        c.brain.setHeard(raw)
+        if (rest.isNotBlank() && rest != "[unk]") {
+            dispatch(rest)
+        } else {
+            c.feedback.cue()
+            _state.value = _state.value.copy(awaitingCommand = true)
+            updateNotification()
+            windowJob?.cancel()
+            windowJob = scope.launch {
+                delay(COMMAND_WINDOW_MS)
+                endWindow()
+            }
+        }
+    }
+
+    private fun dispatch(command: String) {
+        listenJob?.cancel()
+        listenJob = scope.launch { c.brain.handle(command, c.voice.grammarActive) }
+    }
+
+    private fun endWindow() {
+        windowJob?.cancel()
+        if (_state.value.awaitingCommand) {
+            _state.value = _state.value.copy(awaitingCommand = false)
+            updateNotification()
+        }
+    }
+
+    /** Returns the text after the wake word (may be empty), or null if the wake word wasn't said. */
+    private fun afterWakeWord(text: String): String? {
+        val wake = ArabicNormalizer.normalize(wakeWord)
+        if (wake.isBlank()) return null
+        if (text == wake) return ""
+        if (text.startsWith("$wake ")) return text.removePrefix(wake).trim()
+        val words = text.split(' ')
+        val n = wake.split(' ').size
+        if (words.size < n) return null
+        val head = words.take(n).joinToString(" ")
+        return if (FuzzyMatcher.ratio(head, wake) >= 0.8) words.drop(n).joinToString(" ") else null
+    }
+
+    private fun applyPause() {
+        val p = userPaused || speaking || (screenOff && pauseOnScreenOff)
+        c.voice.setPaused(p)
+        if (_state.value.paused != userPaused) {
+            _state.value = _state.value.copy(paused = userPaused)
+            updateNotification()
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val st = _state.value
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), flags)
+        val toggle = PendingIntent.getService(
+            this, 1,
+            Intent(this, ListeningService::class.java).setAction(if (userPaused) ACTION_RESUME else ACTION_PAUSE),
+            flags,
+        )
+        val stop = PendingIntent.getService(
+            this, 2, Intent(this, ListeningService::class.java).setAction(ACTION_STOP), flags,
+        )
+        val text = when {
+            userPaused -> "متوقف مؤقتًا"
+            st.awaitingCommand -> "بسمعك… قول الأمر"
+            else -> "قول \"$wakeWord\" وبعدها الأمر".takeIf { wakeWord.isNotBlank() } ?: "شغال"
+        }
+        return NotificationCompat.Builder(this, Notifier.CH_LISTEN)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF3D7BFF.toInt())
+            .setContentTitle("نبرة")
+            .setContentText(text)
+            .setContentIntent(open)
+            .setOngoing(true)
+            .setSilent(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addAction(0, if (userPaused) "استكمال" else "إيقاف مؤقت", toggle)
+            .addAction(0, "إيقاف", stop)
+            .build()
+    }
+
+    private fun updateNotification() {
+        if (!started) return
+        runCatching {
+            androidx.core.app.NotificationManagerCompat.from(this).notify(Notifier.ID_SERVICE, buildNotification())
+        }
+    }
+
+    private fun stopEverything() {
+        if (started) {
+            runCatching { unregisterReceiver(screenReceiver) }
+            runCatching { unregisterReceiver(packageReceiver) }
+        }
+        started = false
+        c.scope.launch { c.voice.stopContinuous() }
+        _state.value = State()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        if (started) stopEverything()
+        scope.cancel()
+        super.onDestroy()
+    }
+}

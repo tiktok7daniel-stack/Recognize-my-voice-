@@ -1,0 +1,167 @@
+# نبرة (Nabra): personal voice assistant for Android
+
+A private Android app (Kotlin + Jetpack Compose) that controls the whole phone by
+voice in **Egyptian Arabic**. Speech recognition runs **offline** on the phone (Vosk).
+You build your own commands: say one word, and the app runs a chain of actions.
+
+> Example: say **"يا مساعد … واحد"**. Nabra sends your last 2 photos to Claude,
+> waits, types **"حلهم"**, and presses **Send**.
+
+Personal use only. Not for Google Play (it uses `QUERY_ALL_PACKAGES` and an
+AccessibilityService that controls other apps).
+
+---
+
+## Get the APK (no computer needed)
+
+Every push builds a debug APK with GitHub Actions.
+
+1. Open the repo on GitHub, then **Actions** → **Build APK** → the latest green run.
+2. Under **Artifacts**, download **Nabra-debug-apk** (a zip file), then unzip it.
+3. Open the `.apk` on your phone and allow "Install unknown apps".
+
+To build manually, use **Actions → Build APK → Run workflow**.
+
+Local build (optional): `./gradlew assembleDebug` (JDK 17 and Android SDK 35).
+
+## First launch
+
+1. **Intro**, then **Permissions**. Each permission has a status chip, an explanation,
+   and a button that opens the right settings page:
+   * Microphone, and the Accessibility service ("the hands"). These two are essential.
+   * Photos, Notifications, Ignore battery optimizations, Display over other apps.
+   * **Android 13+ sideloaded apps**: if the Accessibility switch is greyed out, open
+     *App info → ⋮ → Allow restricted settings*, then enable it.
+   * There is an OEM card (Xiaomi / Samsung / Huawei / Oppo / Vivo) with links to their
+     autostart and battery screens, plus dontkillmyapp.com.
+2. **Voice model download** (once, with a progress bar and resume support). If the
+   download fails, you can retry or import a zip you downloaded in the browser.
+3. **Home**: tap the glowing orb to start listening.
+
+## Vosk Arabic model
+
+| Model | Size | Notes |
+|---|---|---|
+| `vosk-model-ar-mgb2-0.4` (**default**) | ~318 MB | Trained on MGB-2 broadcast Arabic (MSA + dialects). Best accuracy/size trade-off for a phone. |
+| `vosk-model-small-ar-tn-0.1-linto` | ~160 MB | Small and fast, supports runtime grammar, but Tunisian dialect. |
+| `vosk-model-ar-0.22-linto-1.1.0` | ~1.3 GB | Very accurate, too heavy for most phones. |
+
+There is no official Egyptian Vosk model. Nabra makes up for it in two ways:
+
+* **Grammar mode.** When the model supports runtime graphs (`graph/HCLr.fst` + `Gr.fst`),
+  the recognizer is limited to a **dynamic grammar**: the wake word, the system
+  phrases, "افتح" + every app name and alias, and all your triggers. This is far more
+  accurate and avoids false triggers. The grammar is rebuilt automatically when apps
+  are installed or removed, or when commands, aliases or the wake word change.
+* **Free-form fallback.** With a static-graph model, Nabra recognizes free text and
+  matches it with normalized fuzzy matching. Normalization strips diacritics and
+  tatweel, maps أ/إ/آ → ا, ة → ه, ى → ي, and converts Arabic digits.
+
+You can pick a model or paste a custom zip URL in *Settings → Voice model*.
+
+## How it works
+
+```
+"يا مساعد"  →  vibrate/beep  →  ~6 s command window  →  resolve:
+   1. Custom commands   (exact / fuzzy match on all recorded trigger variants)
+   2. System commands   (رجوع، الرئيسية، انزل، سكرين شوت، علّي الصوت، الكشاف…)
+   3. "افتح <app>"       (labels + your aliases + built-in Egyptian names + transliteration)
+   4. AI mode           (only if enabled and available)
+   5. "مفهمتش"          + a notification showing what was heard
+```
+
+You can also say it in one breath: **"يا مساعد افتح يوتيوب"**. The Home screen has a
+**"try a typed command"** box for testing without speaking.
+
+### System commands
+رجوع • الرئيسية • التطبيقات الأخيرة • الإشعارات • الإعدادات السريعة •
+سكرين شوت (API 28+) • اقفل الشاشة (API 28+) • انزل / اطلع •
+اضغط على <نص> • اكتب <نص> • علّي / وطّي الصوت • شغّل / اطفي الكشاف •
+واي فاي / بلوتوث (these open the system panel, because direct toggling is restricted).
+
+If you say "اكتب" or "اضغط على" without text, Nabra asks for the text and listens
+in free-form mode.
+
+## Adding commands (the main feature)
+
+**My commands → New command**
+
+1. **Trigger**: tap *Record with your voice* and say the word 2–3 times. Every
+   recognized variant is saved as an accepted trigger. You can edit the text or add
+   it manually.
+2. **Steps**: add as many as you want, and drag ☰ to reorder them:
+   * Open app (searchable list with icons)
+   * **Attach last N photos to app**: uses MediaStore + `ACTION_SEND(_MULTIPLE)` with the
+     target's share activity directly. This is more reliable than tapping through the UI.
+   * Type text • Press send (finds Send / إرسال / Invia, or the clickable node nearest
+     the input field) • Click on text • Wait (ms) • Back / Home / Scroll •
+     any system command
+3. **Save**. The grammar rebuilds immediately. Use **Test (▶)** to run a command without
+   speaking.
+
+Every UI step **waits for its target** by polling the accessibility tree (5 s
+timeout) instead of using fixed sleeps. If a step fails, the chain stops, Nabra says
+which step failed, posts a notification naming it, and writes an entry to
+*Settings → Log*.
+
+The demo command **"واحد"** is created on first launch. The Claude package is resolved
+at runtime through PackageManager, not hardcoded.
+
+**Import / export**: *Settings → Data* saves or loads all commands and aliases as JSON.
+
+**App names**: the *Apps* tab lets you give any app extra spoken names (typed or
+recorded), for example يوتيوب → YouTube or كلود → Claude.
+
+## AI mode (optional, off by default)
+
+Used only when no offline command matched.
+
+* **Providers**
+  * **Claude (Anthropic)** through the official `anthropic-java` SDK. The default model
+    is `claude-opus-5-5`; you can change it in settings. Server-side refusal fallbacks
+    are enabled.
+  * **Any OpenAI-compatible API** (OpenAI, OpenRouter, Groq, Gemini's OpenAI endpoint…)
+    or a **local model on the phone**: run `llama.cpp`'s server or Ollama in Termux, and
+    set the Base URL to `http://127.0.0.1:8080/v1`. A local model works offline.
+* The API key is encrypted with an AES-GCM key stored in the **Android Keystore**.
+* **Agent loop** (max 15 steps):
+  1. The visible accessibility tree is serialized as a compact numbered list
+     (`index|class|text|desc|flags|bounds`).
+  2. The model replies with **one** strict-JSON action: `click`, `type`, `open_app`,
+     `scroll`, `back`, `home`, `wait` or `done`.
+  3. Nabra runs the action, waits for the UI to settle, and repeats.
+* **Safety**
+  * Saying **"وقف"** cancels immediately.
+  * Sending, posting, buying, paying, deleting, or anything inside system settings
+    needs **confirmation**, by voice ("أيوه" / "لا") or with the notification buttons.
+  * Nabra **never runs inside banking, wallet or password-manager apps**.
+
+In grammar mode, Nabra first says "قول الأمر" and then records your AI command in
+free-form mode, for that one utterance only.
+
+## Battery and reliability
+
+* One recognizer, 16 kHz mono. Listening pauses while TTS speaks and while the screen
+  is off (configurable).
+* A foreground service (`microphone` type) with Pause / Stop actions, `START_STICKY`.
+* **Start on boot** (optional). On Android 14+, the system may block starting the
+  microphone from boot. In that case Nabra posts a notification; tap it to start.
+* If the Accessibility service gets disabled, Nabra posts a notification that links
+  straight to the settings page.
+
+## Project structure
+
+```
+app/src/main/java/com/daniel/assistant/
+├── ui/             Compose screens (intro, onboarding, home, commands, aliases, logs, settings, theme)
+├── service/        ListeningService (FGS), AssistantBrain, Notifier, BootReceiver
+├── voice/          VoiceEngine (Vosk), ModelManager, GrammarBuilder, ArabicNormalizer, FuzzyMatcher, Feedback (TTS)
+├── commands/       Step model, SysAction, CommandResolver, aliases, import/export, demo seeder
+├── executor/       CommandExecutor, PhotoSharer, AppLauncher
+├── accessibility/  AssistantAccessibilityService, NodeActions, ScreenSerializer
+├── ai/             AiAgent, providers (Anthropic SDK / OpenAI-compatible), SafetyGuard, confirmations
+└── data/           Room (commands, aliases, logs), DataStore settings, Keystore crypto, AppIndex
+```
+
+Unit tests (`app/src/test`) cover normalization, fuzzy matching, resolution priority,
+the grammar, step JSON round-trips, AI action parsing, and import/export.

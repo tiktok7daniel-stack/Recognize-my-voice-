@@ -96,6 +96,25 @@ fun SettingsScreen(
 
     fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
+    var localCopy by remember { mutableStateOf<String?>(null) }
+    val llmPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            localCopy = "بنسخ الموديل… (ممكن ياخد دقيقة)"
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val dest = com.daniel.assistant.ai.OnDeviceProvider.modelFile(context)
+                    dest.parentFile?.mkdirs()
+                    val tmp = java.io.File(dest.parentFile, "model.tmp")
+                    context.contentResolver.openInputStream(uri)!!.use { input -> tmp.outputStream().use { input.copyTo(it, 1 shl 20) } }
+                    com.daniel.assistant.ai.OnDeviceProvider.release()
+                    dest.delete()
+                    tmp.renameTo(dest)
+                }.getOrDefault(false)
+            }
+            localCopy = if (ok) "اتنسخ ✅" else "فشل نسخ الملف"
+        }
+    }
+
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val text = ImportExport.encode(
@@ -118,7 +137,7 @@ fun SettingsScreen(
             }
             result.onSuccess { bundle ->
                 bundle.commands.forEach { e ->
-                    c.repo.save(CustomCommand(name = e.name, enabled = e.enabled, triggers = e.triggers, steps = e.steps))
+                    c.repo.save(CustomCommand(name = e.name, enabled = e.enabled, triggers = e.triggers, steps = e.steps, autoTime = e.autoTime, autoApp = e.autoApp))
                 }
                 val existing = c.repo.allAliases().map { it.packageName to it.alias }.toSet()
                 bundle.aliases.filter { (it.packageName to it.alias) !in existing }
@@ -183,6 +202,9 @@ fun SettingsScreen(
                     )
                 }
 
+                SectionTitle("الأمان")
+                VoiceLockSection(settings)
+
                 SectionTitle("الصوت والاستماع")
                 GlassCard {
                     SettingSwitch("الرد بالصوت (TTS)", "تأكيدات قصيرة زي \"حاضر\"", settings.ttsEnabled) { v -> scope.launch { c.settings.setTts(v) } }
@@ -221,12 +243,34 @@ fun SettingsScreen(
                             FilterChip(settings.aiProvider == p.id, {
                                 scope.launch {
                                     c.settings.setAiProvider(p.id)
-                                    c.settings.setAiModel(if (p == ProviderKind.ANTHROPIC) AiDefaults.ANTHROPIC_MODEL else AiDefaults.OPENAI_MODEL)
+                                    when (p) {
+                                        ProviderKind.ANTHROPIC -> c.settings.setAiModel(AiDefaults.ANTHROPIC_MODEL)
+                                        ProviderKind.OPENAI_COMPATIBLE -> c.settings.setAiModel(AiDefaults.OPENAI_MODEL)
+                                        ProviderKind.ON_DEVICE -> Unit
+                                    }
                                 }
                             }, { Text(p.title) }, colors = chipColors())
                         }
                     }
                     Spacer(Modifier.height(8.dp))
+                    if (settings.aiProvider == ProviderKind.ON_DEVICE.id) {
+                        val f = com.daniel.assistant.ai.OnDeviceProvider.modelFile(context)
+                        Text(
+                            if (f.exists()) "✅ الموديل المحلي جاهز (${f.length() / (1024 * 1024)} MB)" else "مفيش موديل محلي لسه",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        localCopy?.let { Text(it, color = Neo.Cyan, style = MaterialTheme.typography.bodySmall) }
+                        Spacer(Modifier.height(6.dp))
+                        PillButton("اختار ملف الموديل (.task)", {
+                            llmPicker.launch(arrayOf("*/*"))
+                        }, primary = !f.exists())
+                        Text(
+                            "نزّل موديل Gemma 3 1B بصيغة .task (حوالي 550 ميجا) من صفحة Gemma على Kaggle أو Hugging Face، " +
+                                "وبعدين اختاره من هنا. بيشتغل جوه الموبايل من غير نت ومن غير مفتاح. " +
+                                "الموديلات الصغيرة أضعف من Claude في التحكم في الشاشة.",
+                            style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp),
+                        )
+                    } else {
                     NeoTextField(aiModel, { aiModel = it }, "اسم الموديل")
                     if (settings.aiProvider == ProviderKind.OPENAI_COMPATIBLE.id) {
                         Spacer(Modifier.height(8.dp))
@@ -248,6 +292,7 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PillButton("حفظ", {

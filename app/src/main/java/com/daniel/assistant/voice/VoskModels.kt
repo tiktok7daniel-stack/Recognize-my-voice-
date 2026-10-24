@@ -18,7 +18,7 @@ object VoskModels {
         title = "عربي صغير (لهجة تونسية)",
         sizeMb = 160,
         url = BASE + "vosk-model-small-ar-tn-0.1-linto.zip",
-        note = "أصغر وأسرع ويدعم الجرامر الديناميكي، لكن لهجته مش مصرية",
+        note = "الأخف على البطارية: بيدعم الجرامر فبيسمع كلمة التنبيه بس، ومع محرك Google للأوامر بيبقى أفضل اختيار للبطارية",
     )
     val LINTO_BIG = VoskModelInfo(
         id = "vosk-model-ar-0.22-linto-1.1.0",

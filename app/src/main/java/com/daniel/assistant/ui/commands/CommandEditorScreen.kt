@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
@@ -83,6 +85,11 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
     val steps = remember { mutableStateListOf<UiStep>() }
     var nextKey by remember { mutableLongStateOf(1L) }
     var loaded by remember { mutableStateOf(commandId == null) }
+    var autoTime by remember { mutableStateOf<String?>(null) }
+    var autoApp by remember { mutableStateOf<String?>(null) }
+    var autoAppLabel by remember { mutableStateOf<String?>(null) }
+    var pickAutoApp by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var showRecorder by remember { mutableStateOf(false) }
     var showManual by remember { mutableStateOf(false) }
@@ -95,6 +102,9 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
             c.repo.get(commandId)?.let { cmd ->
                 name = cmd.name
                 enabled = cmd.enabled
+                autoTime = cmd.autoTime
+                autoApp = cmd.autoApp
+                autoAppLabel = cmd.autoApp?.let { c.appIndex.labelOf(it) ?: it }
                 triggers.clear(); triggers.addAll(cmd.triggers)
                 steps.clear(); cmd.steps.forEach { steps.add(UiStep(nextKey++, it)) }
             }
@@ -125,6 +135,8 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                     enabled = enabled,
                     triggers = triggers.toList(),
                     steps = steps.map { it.step },
+                    autoTime = autoTime,
+                    autoApp = autoApp,
                 )
             )
             onBack()
@@ -235,6 +247,50 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                         }
                     }
                 }
+                item(key = "auto") {
+                    SectionTitle("تشغيل تلقائي (اختياري)")
+                    GlassCard {
+                        Text("الأمر يشتغل لوحده من غير ما تقول حاجة:", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconBubble(Icons.Filled.Schedule, size = 36)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                autoTime?.let { "كل يوم الساعة $it" } ?: "كل يوم في ساعة معينة",
+                                style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f),
+                            )
+                            if (autoTime != null) {
+                                IconButton(onClick = { autoTime = null }) { Icon(Icons.Filled.Close, "إلغاء", tint = Neo.TextDim) }
+                            }
+                            TextButton(onClick = {
+                                val parts = autoTime?.split(":")
+                                android.app.TimePickerDialog(
+                                    context,
+                                    { _, h, m -> autoTime = "%02d:%02d".format(h, m) },
+                                    parts?.getOrNull(0)?.toIntOrNull() ?: 8,
+                                    parts?.getOrNull(1)?.toIntOrNull() ?: 0,
+                                    true,
+                                ).show()
+                            }) { Text(if (autoTime == null) "اختار" else "تغيير", color = Neo.Cyan) }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconBubble(Icons.Filled.Apps, size = 36)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                autoAppLabel?.let { "لما أفتح $it" } ?: "لما أفتح تطبيق معيّن",
+                                style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f),
+                            )
+                            if (autoApp != null) {
+                                IconButton(onClick = { autoApp = null; autoAppLabel = null }) { Icon(Icons.Filled.Close, "إلغاء", tint = Neo.TextDim) }
+                            }
+                            TextButton(onClick = { pickAutoApp = true }) { Text(if (autoApp == null) "اختار" else "تغيير", color = Neo.Cyan) }
+                        }
+                        Text(
+                            "التشغيل عند فتح تطبيق محتاج خدمة إمكانية الوصول، ومش بيتكرر أكتر من مرة في الدقيقة.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
                 item(key = "space") { Spacer(Modifier.height(20.dp)) }
             }
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
@@ -257,7 +313,18 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
             onDismissRequest = { showManual = false },
             containerColor = Neo.Bg1,
             title = { Text("اكتب كلمة التشغيل") },
-            text = { NeoTextField(text, { text = it }, "مثلاً: واحد") },
+            text = {
+                Column {
+                    NeoTextField(text, { text = it }, "مثلاً: واحد")
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "متغيرات: حط كلمة بين { } عشان تتملى من كلامك. مثلاً \"ابعت لـ {اسم} {رسالة}\" ← " +
+                            "لما تقول \"ابعت لأحمد أنا جاي\" تقدر تستخدم {اسم} و{رسالة} في الخطوات (اكتب / اضغط على).",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = { text = "ابعت لـ {اسم} {رسالة}" }) { Text("جرّب المثال", color = Neo.Cyan) }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val t = text.trim()
@@ -267,6 +334,13 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { showManual = false }) { Text("إلغاء", color = Neo.TextDim) } },
         )
+    }
+    if (pickAutoApp) {
+        com.daniel.assistant.ui.apps.AppPickerDialog(onDismiss = { pickAutoApp = false }) { app ->
+            autoApp = app.packageName
+            autoAppLabel = app.label
+            pickAutoApp = false
+        }
     }
     if (showTypePicker) {
         StepTypePicker(onDismiss = { showTypePicker = false }) { t ->

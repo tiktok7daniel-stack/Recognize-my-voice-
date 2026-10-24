@@ -16,6 +16,7 @@ class BootReceiver : BroadcastReceiver() {
         val container = (context.applicationContext as NabraApp).container
         CoroutineScope(Dispatchers.Main).launch {
             try {
+                container.automations.schedule(container.repo.all())
                 val s = container.settings.current()
                 if (s.startOnBoot && container.models.isReady()) {
                     try {

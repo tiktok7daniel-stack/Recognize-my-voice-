@@ -486,6 +486,27 @@ private fun buildPages(): List<TutorialPage> = listOf(
         },
     ),
     TutorialPage(
+        tag = "مميزات متقدمة",
+        title = "خلّي أوامرك أذكى",
+        lines = listOf(
+            "متغيرات: كلمة تشغيل زي \"ابعت لـ {اسم} {رسالة}\"، ولما تقول \"ابعت لأحمد أنا جاي\" التطبيق يستخدم {اسم} و{رسالة} في الخطوات.",
+            "تشغيل تلقائي: من آخر شاشة تعديل الأمر، خليه يشتغل كل يوم في ساعة معينة، أو لما تفتح تطبيق معيّن.",
+            "لوحة التنفيذ: وهو بينفّذ، هيظهر شريط صغير فوق فيه الخطوة اللي هو فيها وزرار \"وقف\" (محتاج صلاحية الظهور فوق التطبيقات).",
+            "قفل الصوت: من الإعدادات ← الأمان، سجّل بصمة صوتك عشان التطبيق ميشتغلش غير بصوتك أنت.",
+        ),
+        tip = "الذكاء الاصطناعي كمان ممكن يشتغل جوه الموبايل من غير نت: الإعدادات ← الذكاء الاصطناعي ← \"موديل جوه الموبايل\".",
+        illustration = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Bubble("ابعت لـ {اسم} {رسالة}", true)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconBubble(Icons.Filled.Timer, Neo.Cyan, 52)
+                    IconBubble(Icons.Filled.TouchApp, Neo.Accent, 52)
+                    IconBubble(Icons.Filled.Mic, Neo.Success, 52)
+                }
+            }
+        },
+    ),
+    TutorialPage(
         tag = "لو حاجة مش ماشية",
         title = "إزاي تعرف المشكلة",
         lines = listOf(

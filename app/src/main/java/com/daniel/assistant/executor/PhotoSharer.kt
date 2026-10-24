@@ -27,7 +27,7 @@ object PhotoSharer {
     }
 
     /** Returns null on success or an Arabic error message. */
-    fun share(context: Context, targetPackage: String, count: Int): String? {
+    fun share(context: Context, targetPackage: String, count: Int, text: String? = null): String? {
         val uris = try {
             latestImages(context, count)
         } catch (e: SecurityException) {
@@ -41,6 +41,7 @@ object PhotoSharer {
             Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
         }
         intent.type = "image/*"
+        if (!text.isNullOrBlank()) intent.putExtra(Intent.EXTRA_TEXT, text)
         val clip = ClipData.newUri(context.contentResolver, "images", uris.first())
         uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
         intent.clipData = clip

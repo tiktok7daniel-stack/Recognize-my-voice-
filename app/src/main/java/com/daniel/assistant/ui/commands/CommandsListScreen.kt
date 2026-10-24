@@ -118,7 +118,12 @@ private fun CommandCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(cmd.name, style = MaterialTheme.typography.titleMedium)
-                Text("${cmd.steps.size} خطوات", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "${cmd.steps.size} خطوات" +
+                        (cmd.autoTime?.let { " • ⏰ $it" } ?: "") +
+                        (if (cmd.autoApp != null) " • 📱 تلقائي" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             Switch(
                 checked = cmd.enabled,

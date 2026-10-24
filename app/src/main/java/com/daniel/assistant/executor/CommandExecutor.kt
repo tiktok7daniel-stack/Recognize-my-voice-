@@ -16,6 +16,7 @@ import com.daniel.assistant.commands.CommandResolver
 import com.daniel.assistant.commands.CustomCommand
 import com.daniel.assistant.commands.Step
 import com.daniel.assistant.commands.SysAction
+import com.daniel.assistant.commands.withVars
 import com.daniel.assistant.data.AppIndex
 import com.daniel.assistant.data.ExecLog
 import com.daniel.assistant.service.Notifier
@@ -46,13 +47,19 @@ class CommandExecutor(
     /** Name of the command currently running, or null. */
     val running: StateFlow<String?> = _running.asStateFlow()
 
+    data class Progress(val command: String, val index: Int, val total: Int, val step: String)
+    private val _progress = MutableStateFlow<Progress?>(null)
+    /** Current step of the running command (for the on-screen execution panel). */
+    val progress: StateFlow<Progress?> = _progress.asStateFlow()
+
     var stepTimeoutMs = 5_000L
 
-    fun run(command: CustomCommand, announce: Boolean = true): Job {
+    fun run(command: CustomCommand, vars: Map<String, String> = emptyMap(), announce: Boolean = true): Job {
         cancel()
         return scope.launch {
             if (announce) feedback.say("حاضر")
-            execute(command.name, command.steps)
+            if (vars.isNotEmpty()) log.info("متغيرات: " + vars.entries.joinToString { "${it.key}=${it.value}" })
+            execute(command.name, command.steps.map { it.withVars(vars) })
         }.also { job = it }
     }
 
@@ -60,6 +67,7 @@ class CommandExecutor(
         job?.cancel()
         job = null
         _running.value = null
+        _progress.value = null
     }
 
     /** Runs the steps; returns true on success. */
@@ -68,6 +76,7 @@ class CommandExecutor(
         log.info("تشغيل \"$name\" (${steps.size} خطوات)")
         try {
             steps.forEachIndexed { i, step ->
+                _progress.value = Progress(name, i + 1, steps.size, step.describe())
                 val error = if (step.needsAccessibility && service() == null) {
                     notifier.accessibilityDisabled()
                     "خدمة إمكانية الوصول مقفولة — فعّلها من الإعدادات"
@@ -84,6 +93,7 @@ class CommandExecutor(
             return true
         } finally {
             _running.value = null
+            _progress.value = null
         }
     }
 
@@ -91,14 +101,7 @@ class CommandExecutor(
         is Step.OpenApp -> openApp(step.packageName, step.label)
         is Step.AttachPhotos -> attachPhotos(step)
         is Step.TypeText -> typeText(step.text)
-        Step.PressSend -> {
-            val node = waitFor { NodeActions.findSendButton(it.root()) }
-            when {
-                node == null -> "مش لاقي زرار الإرسال"
-                !NodeActions.clickNode(service()!!, node) -> "مقدرتش أدوس إرسال"
-                else -> null
-            }
-        }
+        Step.PressSend -> pressSend()
         is Step.ClickText -> clickText(step.text)
         is Step.Wait -> {
             delay(step.millis.coerceIn(0, 60_000)); null
@@ -182,14 +185,29 @@ class CommandExecutor(
 
     private suspend fun attachPhotos(step: Step.AttachPhotos): String? {
         val target = resolvePackage(step.packageName, step.label) ?: return "التطبيق \"${step.label}\" مش متثبت"
-        PhotoSharer.share(context, target, step.count.coerceIn(1, 20))?.let { return it }
+        PhotoSharer.share(context, target, step.count.coerceIn(1, 20), step.text)?.let { return it }
         waitForForeground(target)
         return null
     }
 
     private suspend fun typeText(text: String): String? {
         val node = waitFor { NodeActions.findEditableNode(it.root()) } ?: return "مش لاقي خانة كتابة"
-        return if (NodeActions.setText(node, text)) null else "مقدرتش أكتب في الخانة"
+        if (NodeActions.setText(node, text)) return null
+        // Some apps ignore ACTION_SET_TEXT: tap the field and paste instead.
+        service()?.let { NodeActions.clickNode(it, node) }
+        delay(250)
+        val fresh = NodeActions.findEditableNode(service()?.root()) ?: node
+        return if (NodeActions.pasteText(context, fresh, text)) null else "مقدرتش أكتب في الخانة"
+    }
+
+    private suspend fun pressSend(): String? {
+        val s = service() ?: return NO_ACCESSIBILITY
+        val node = waitFor { NodeActions.findSendButton(it.root()) }
+        if (node != null && NodeActions.clickNode(s, node)) return null
+        // Fallback: the keyboard's "send/enter" action on the text field.
+        val edit = NodeActions.findEditableNode(s.root())
+        if (edit != null && NodeActions.imeEnter(edit)) return null
+        return if (node == null) "مش لاقي زرار الإرسال" else "مقدرتش أدوس إرسال"
     }
 
     private suspend fun clickText(text: String): String? {

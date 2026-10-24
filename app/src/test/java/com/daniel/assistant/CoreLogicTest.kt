@@ -8,6 +8,7 @@ import com.daniel.assistant.commands.CustomCommand
 import com.daniel.assistant.commands.Resolution
 import com.daniel.assistant.commands.Step
 import com.daniel.assistant.commands.SysAction
+import com.daniel.assistant.commands.withVars
 import com.daniel.assistant.voice.ArabicNormalizer
 import com.daniel.assistant.voice.FuzzyMatcher
 import com.daniel.assistant.voice.GrammarBuilder
@@ -156,5 +157,28 @@ class RecognitionUpgradeTest {
         assertEquals("يا مساعد", ArabicNormalizer.fromBuckwalterIfNeeded("yA msAEd"))
         assertEquals("واحد", ArabicNormalizer.fromBuckwalterIfNeeded("واحد"))
         assertEquals("[unk]", ArabicNormalizer.fromBuckwalterIfNeeded("[unk]"))
+    }
+}
+
+class VariablesTest {
+    private val send = CustomCommand(
+        id = 5, name = "رسالة", triggers = listOf("ابعت لـ {اسم} {رسالة}"),
+        steps = listOf(Step.ClickText("{اسم}"), Step.TypeText("{رسالة}"), Step.PressSend),
+    )
+
+    @Test fun extractsVariables() {
+        val v = com.daniel.assistant.commands.Variables.match("ابعت لـ {اسم} {رسالة}", "ابعت لأحمد أنا جاي في الطريق")
+        assertEquals(mapOf("اسم" to "أحمد", "رسالة" to "أنا جاي في الطريق"), v)
+        val v2 = com.daniel.assistant.commands.Variables.match("ابحث عن {حاجة}", "إبحث عن مطاعم قريبة")
+        assertEquals(mapOf("حاجة" to "مطاعم قريبة"), v2)
+        assertEquals(null, com.daniel.assistant.commands.Variables.match("ابحث عن {حاجة}", "افتح يوتيوب"))
+    }
+
+    @Test fun resolverFillsSteps() {
+        val r = CommandResolver().resolve("ابعت لماما تعالي", listOf(send), emptyList(), false) as Resolution.Custom
+        assertEquals("ماما", r.vars["اسم"])
+        val steps = r.command.steps.map { it.withVars(r.vars) }
+        assertEquals(Step.TypeText("تعالي"), steps[1])
+        assertEquals(Step.ClickText("ماما"), steps[0])
     }
 }

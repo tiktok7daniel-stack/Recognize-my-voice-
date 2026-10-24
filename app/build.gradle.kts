@@ -17,6 +17,8 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         vectorDrawables { useSupportLibrary = true }
+        // Modern 64-bit phones only: keeps the APK small (Vosk/JNA ship big native libs per ABI).
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     // Fixed signing key so every CI build installs as an update over the previous one.
@@ -30,6 +32,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Shrink unused code/resources (e.g. the large icon set) — no obfuscation, see proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -98,6 +106,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.reorderable)
     implementation(libs.anthropic.java)
+    implementation(libs.mediapipe.genai)
 
     // Vosk offline speech recognition (aar + JNA aar, as recommended by Vosk docs)
     implementation("com.alphacephei:vosk-android:0.3.47@aar")

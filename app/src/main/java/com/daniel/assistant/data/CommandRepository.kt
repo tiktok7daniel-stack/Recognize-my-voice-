@@ -32,6 +32,8 @@ class CommandRepository(private val dao: CommandDao, private val aliasDao: Alias
             triggersJson = CommandJson.json.encodeToString(stringsSer, c.triggers),
             stepsJson = CommandJson.json.encodeToString(stepsSer, c.steps),
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            autoTime = c.autoTime,
+            autoApp = c.autoApp,
         )
         val id = dao.upsert(entity)
         return if (c.id != 0L) c.id else id
@@ -52,6 +54,8 @@ class CommandRepository(private val dao: CommandDao, private val aliasDao: Alias
             enabled = e.enabled,
             triggers = CommandJson.json.decodeFromString(stringsSer, e.triggersJson),
             steps = CommandJson.json.decodeFromString(stepsSer, e.stepsJson),
+            autoTime = e.autoTime,
+            autoApp = e.autoApp,
         )
     }.getOrNull()
 }

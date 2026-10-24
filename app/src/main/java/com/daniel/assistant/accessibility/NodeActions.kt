@@ -14,6 +14,7 @@ object NodeActions {
 
     private val SEND_WORDS = listOf(
         "send", "إرسال", "ارسال", "أرسل", "ارسل", "invia", "envoyer", "enviar", "senden", "submit",
+        "send message", "إرسال رسالة", "arrow_up", "btn_send", "send_button",
     )
 
     fun walk(root: AccessibilityNodeInfo?, visit: (AccessibilityNodeInfo) -> Unit) {
@@ -120,6 +121,20 @@ object NodeActions {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }
         return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
+    /** Puts [text] on the clipboard and pastes it into [node]. */
+    fun pasteText(context: android.content.Context, node: AccessibilityNodeInfo, text: String): Boolean {
+        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("nabra", text))
+        node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    }
+
+    /** Triggers the keyboard's action (send / enter) on a text field — Android 11+. */
+    fun imeEnter(node: AccessibilityNodeInfo): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 30) return false
+        return node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
     }
 
     /** Scrolls the largest scrollable container; falls back to a swipe. */

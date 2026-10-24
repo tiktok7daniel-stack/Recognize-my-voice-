@@ -4,6 +4,7 @@ import com.daniel.assistant.AppContainer
 import com.daniel.assistant.commands.CommandResolver
 import com.daniel.assistant.commands.Resolution
 import com.daniel.assistant.commands.SysAction
+import com.daniel.assistant.commands.Variables
 import com.daniel.assistant.voice.ArabicNormalizer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +41,7 @@ class AssistantBrain(private val c: AppContainer) {
     /** Phrases that bias the online recognizer toward things the user actually says. */
     private suspend fun biasPhrases(): List<String> {
         val out = mutableListOf<String>()
-        c.repo.all().filter { it.enabled }.forEach { out.addAll(it.triggers) }
+        c.repo.all().filter { it.enabled }.forEach { cmd -> out.addAll(cmd.triggers.map(Variables::literal)) }
         SysAction.entries.forEach { out.addAll(it.phrases) }
         c.appEntries().forEach { app ->
             app.spokenNames.filter { ArabicNormalizer.isArabic(it) }.take(2).forEach { out.add("افتح $it") }
@@ -130,7 +131,7 @@ class AssistantBrain(private val c: AppContainer) {
         when (res) {
             is Resolution.Custom -> {
                 result("أمر: ${res.command.name}")
-                c.executor.run(res.command)
+                c.executor.run(res.command, res.vars)
             }
             is Resolution.System -> {
                 result("نظام: ${res.action.title}")

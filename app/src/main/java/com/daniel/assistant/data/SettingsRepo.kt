@@ -42,6 +42,9 @@ data class AppSettings(
     /** Run custom command triggers even without the wake word. */
     val directTriggers: Boolean = true,
     val floatingBubble: Boolean = false,
+    val voiceLock: Boolean = false,
+    val voicePrint: String = "",
+    val voiceLockThreshold: Float = 0.55f,
     val aiEnabled: Boolean = false,
     val aiProvider: String = "anthropic",
     val aiModel: String = AiDefaults.ANTHROPIC_MODEL,
@@ -69,6 +72,9 @@ class SettingsRepo(private val context: Context) {
         val engine = stringPreferencesKey("command_engine")
         val direct = booleanPreferencesKey("direct_triggers")
         val bubble = booleanPreferencesKey("floating_bubble")
+        val voiceLock = booleanPreferencesKey("voice_lock")
+        val voicePrint = stringPreferencesKey("voice_print")
+        val voiceLockThreshold = floatPreferencesKey("voice_lock_threshold")
         val aiEnabled = booleanPreferencesKey("ai_enabled")
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiModel = stringPreferencesKey("ai_model")
@@ -96,6 +102,9 @@ class SettingsRepo(private val context: Context) {
             commandEngine = p[K.engine] ?: d.commandEngine,
             directTriggers = p[K.direct] ?: d.directTriggers,
             floatingBubble = p[K.bubble] ?: d.floatingBubble,
+            voiceLock = p[K.voiceLock] ?: d.voiceLock,
+            voicePrint = p[K.voicePrint] ?: d.voicePrint,
+            voiceLockThreshold = p[K.voiceLockThreshold] ?: d.voiceLockThreshold,
             aiEnabled = p[K.aiEnabled] ?: d.aiEnabled,
             aiProvider = p[K.aiProvider] ?: d.aiProvider,
             aiModel = p[K.aiModel]?.takeIf { it.isNotBlank() } ?: d.aiModel,
@@ -127,6 +136,9 @@ class SettingsRepo(private val context: Context) {
     suspend fun setCommandEngine(v: String) = edit { it[K.engine] = v }
     suspend fun setDirectTriggers(v: Boolean) = edit { it[K.direct] = v }
     suspend fun setFloatingBubble(v: Boolean) = edit { it[K.bubble] = v }
+    suspend fun setVoiceLock(v: Boolean) = edit { it[K.voiceLock] = v }
+    suspend fun setVoicePrint(v: String) = edit { it[K.voicePrint] = v }
+    suspend fun setVoiceLockThreshold(v: Float) = edit { it[K.voiceLockThreshold] = v }
     suspend fun setAiEnabled(v: Boolean) = edit { it[K.aiEnabled] = v }
     suspend fun setAiProvider(v: String) = edit { it[K.aiProvider] = v }
     suspend fun setAiModel(v: String) = edit { it[K.aiModel] = v.trim() }

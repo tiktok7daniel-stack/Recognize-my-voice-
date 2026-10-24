@@ -83,6 +83,23 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
   **floating mic bubble** over all apps, a **Quick Settings tile**, and a long-press
   **app-icon shortcut**.
 
+## Advanced features
+
+* **Variables in triggers**: `ابعت لـ {اسم} {رسالة}` matches "ابعت لأحمد أنا جاي". Steps can use
+  `{اسم}` / `{رسالة}` in *Type text*, *Click on text*, the photo text, or system-command arguments.
+* **Automations**: a command can run by itself every day at a time (AlarmManager), or when a
+  chosen app comes to the foreground (via the accessibility service, at most once per minute).
+* **Execution panel**: while a command or the AI runs, a small overlay at the top shows the
+  current step and a **Stop** button.
+* **Voice lock**: the Vosk speaker model (`vosk-model-spk-0.4`, 13 MB) creates a voice print.
+  Enroll your voice 3 times; after that, the wake word and direct triggers only work for
+  similar voices (cosine similarity with an adjustable threshold).
+* **On-device AI**: a MediaPipe LLM Inference provider runs a local Gemma `.task` model on the
+  phone, with no internet and no Termux.
+* **Battery**: when commands use the online engine and the Vosk model supports grammars,
+  Vosk only listens for the wake word, your triggers, and "وقف".
+* **Size**: the build is arm64-only and runs R8 shrinking (no obfuscation).
+
 ## How it works
 
 ```

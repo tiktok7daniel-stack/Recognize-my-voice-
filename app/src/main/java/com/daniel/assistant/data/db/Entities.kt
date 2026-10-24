@@ -14,6 +14,8 @@ data class CommandEntity(
     /** JSON array of [com.daniel.assistant.commands.Step]. */
     val stepsJson: String,
     val createdAt: Long = System.currentTimeMillis(),
+    val autoTime: String? = null,
+    val autoApp: String? = null,
 )
 
 @Entity(tableName = "aliases", indices = [Index("packageName")])

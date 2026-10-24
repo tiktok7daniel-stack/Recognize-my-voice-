@@ -51,6 +51,12 @@ class AiAgent(
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
+    private val _status = MutableStateFlow<String?>(null)
+    /** Short description of the AI's current step (for the execution panel). */
+    val status: StateFlow<String?> = _status.asStateFlow()
+    private val _step = MutableStateFlow(0)
+    val step: StateFlow<Int> = _step.asStateFlow()
+
     fun isOnline(): Boolean {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
@@ -61,8 +67,9 @@ class AiAgent(
     suspend fun isAvailable(): Boolean {
         val s = settings.current()
         if (!s.aiEnabled) return false
-        val local = s.aiProvider == ProviderKind.OPENAI_COMPATIBLE.id &&
-            (s.aiBaseUrl.contains("127.0.0.1") || s.aiBaseUrl.contains("localhost"))
+        val local = s.aiProvider == ProviderKind.ON_DEVICE.id ||
+            (s.aiProvider == ProviderKind.OPENAI_COMPATIBLE.id &&
+                (s.aiBaseUrl.contains("127.0.0.1") || s.aiBaseUrl.contains("localhost")))
         return local || isOnline()
     }
 
@@ -87,6 +94,10 @@ class AiAgent(
                 if (key.isBlank()) null else AnthropicProvider(key, s.aiModel)
             }
             ProviderKind.OPENAI_COMPATIBLE -> OpenAiCompatibleProvider(s.aiBaseUrl, key, s.aiModel)
+            ProviderKind.ON_DEVICE -> {
+                val f = OnDeviceProvider.modelFile(context)
+                if (f.exists()) OnDeviceProvider(context, f.absolutePath) else null
+            }
         }
     }
 
@@ -95,8 +106,9 @@ class AiAgent(
         log.info("AI: \"$command\"")
         try {
             val provider = buildProvider() ?: run {
-                feedback.say("حط مفتاح الـ API في الإعدادات الأول")
-                log.error("AI: مفيش مفتاح API")
+                val onDevice = settings.current().aiProvider == ProviderKind.ON_DEVICE.id
+                feedback.say(if (onDevice) "اختار ملف الموديل المحلي من الإعدادات الأول" else "حط مفتاح الـ API في الإعدادات الأول")
+                log.error(if (onDevice) "AI: مفيش ملف موديل محلي" else "AI: مفيش مفتاح API")
                 return
             }
             if (AssistantAccessibilityService.get() == null) {
@@ -108,6 +120,8 @@ class AiAgent(
             val history = mutableListOf<String>()
             val confirmSensitive = settings.current().aiConfirmSensitive
             for (stepNo in 1..MAX_STEPS) {
+                _step.value = stepNo
+                _status.value = "بفكر…"
                 val service = AssistantAccessibilityService.get() ?: run {
                     notifier.accessibilityDisabled(); return
                 }
@@ -151,6 +165,7 @@ class AiAgent(
                         return
                     }
                 }
+                _status.value = describe(action, label)
                 val err = execute(service, action, snap)
                 history.add(describe(action, label) + if (err != null) " -> FAILED: $err" else " -> ok")
                 settle()
@@ -159,6 +174,8 @@ class AiAgent(
             log.error("AI: وصل للحد الأقصى ($MAX_STEPS خطوة)")
         } finally {
             _running.value = false
+            _status.value = null
+            _step.value = 0
         }
     }
 

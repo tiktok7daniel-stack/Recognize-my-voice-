@@ -45,6 +45,13 @@ class VoiceEngine(private val models: ModelManager) {
     private val _listening = MutableStateFlow(false)
     val listening: StateFlow<Boolean> = _listening.asStateFlow()
 
+    /** Speaker (voice-print) model; when set, results carry a voice vector. */
+    @Volatile var speakerModel: org.vosk.SpkModel? = null
+
+    /** Voice-print vector of the most recent final result (null if unavailable). */
+    @Volatile var lastSpeakerVector: FloatArray? = null
+        private set
+
     /** Whether the running continuous recognizer uses a grammar. */
     var grammarActive: Boolean = false
         private set
@@ -111,9 +118,12 @@ class VoiceEngine(private val models: ModelManager) {
                             }
                             override fun onResult(hypothesis: String?) {
                                 val t = parse(hypothesis, "text")
-                                if (t.isNotBlank() && t != "[unk]") finish(t)
+                                if (t.isNotBlank() && t != "[unk]") {
+                                    captureSpeaker(hypothesis); finish(t)
+                                }
                             }
                             override fun onFinalResult(hypothesis: String?) {
+                                captureSpeaker(hypothesis)
                                 finish(parse(hypothesis, "text").ifBlank { lastPartial })
                             }
                             override fun onError(exception: Exception?) = finish(null)
@@ -152,8 +162,8 @@ class VoiceEngine(private val models: ModelManager) {
         model = null
     }
 
-    private fun createRecognizer(m: Model, grammar: String?): Recognizer =
-        if (grammar != null) {
+    private fun createRecognizer(m: Model, grammar: String?): Recognizer {
+        val rec = if (grammar != null) {
             try {
                 Recognizer(m, SAMPLE_RATE, grammar)
             } catch (e: Exception) {
@@ -161,6 +171,16 @@ class VoiceEngine(private val models: ModelManager) {
                 Recognizer(m, SAMPLE_RATE)
             }
         } else Recognizer(m, SAMPLE_RATE)
+        speakerModel?.let { spk -> runCatching { rec.setSpeakerModel(spk) } }
+        return rec
+    }
+
+    private fun captureSpeaker(json: String?) {
+        lastSpeakerVector = runCatching {
+            val arr = JSONObject(json ?: "{}").optJSONArray("spk") ?: return@runCatching null
+            FloatArray(arr.length()) { arr.getDouble(it).toFloat() }
+        }.getOrNull()
+    }
 
     private suspend fun startInternal(cfg: Continuous) {
         val m = model ?: return
@@ -179,11 +199,15 @@ class VoiceEngine(private val models: ModelManager) {
             }
             override fun onResult(hypothesis: String?) {
                 val t = parse(hypothesis, "text")
-                if (t.isNotBlank()) cfg.onResult(t)
+                if (t.isNotBlank()) {
+                    captureSpeaker(hypothesis); cfg.onResult(t)
+                }
             }
             override fun onFinalResult(hypothesis: String?) {
                 val t = parse(hypothesis, "text")
-                if (t.isNotBlank()) cfg.onResult(t)
+                if (t.isNotBlank()) {
+                    captureSpeaker(hypothesis); cfg.onResult(t)
+                }
             }
             override fun onError(exception: Exception?) {
                 cfg.onError(exception ?: RuntimeException("recognizer error"))

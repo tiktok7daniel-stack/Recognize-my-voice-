@@ -43,6 +43,14 @@ import kotlinx.coroutines.launch
  * Foreground service (type=microphone) that keeps Vosk listening for the wake word,
  * opens a ~6 s command window and hands commands to [AssistantBrain].
  */
+private data class ListenKey(
+    val wakeWord: String,
+    val useGrammar: Boolean,
+    val pauseOnScreenOff: Boolean,
+    val onlineCommands: Boolean,
+    val voiceLock: Boolean,
+)
+
 class ListeningService : Service() {
 
     data class State(
@@ -94,6 +102,8 @@ class ListeningService : Service() {
     private var wakeWord = ""
     private var pauseOnScreenOff = true
     private var directTriggers = true
+    private var voicePrint: FloatArray? = null
+    private var voiceThreshold = 0.55f
     private var cachedCommands: List<com.daniel.assistant.commands.CustomCommand> = emptyList()
     private var pendingListenNow = false
     private var modelReady = false
@@ -187,9 +197,11 @@ class ListeningService : Service() {
                 c.feedback.speaking.collect { speaking = it; applyPause() }
             }
             launch {
-                c.settings.flow.map { it.floatingBubble to it.directTriggers }.distinctUntilChanged().collect { (b, d) ->
-                    directTriggers = d
-                    if (b) bubble.show() else bubble.hide()
+                c.settings.flow.collect { st ->
+                    directTriggers = st.directTriggers
+                    voicePrint = if (st.voiceLock) com.daniel.assistant.voice.SpeakerLock.decode(st.voicePrint) else null
+                    voiceThreshold = st.voiceLockThreshold
+                    if (st.floatingBubble) bubble.show() else bubble.hide()
                 }
             }
             launch {
@@ -197,16 +209,20 @@ class ListeningService : Service() {
             }
 
             val settingsKey = c.settings.flow
-                .map { Triple(it.wakeWord, it.useGrammar, it.pauseOnScreenOff) }
+                .map { ListenKey(it.wakeWord, it.useGrammar, it.pauseOnScreenOff, it.commandEngine == "google", it.voiceLock) }
                 .distinctUntilChanged()
             combine(c.repo.commands, c.appEntriesFlow, settingsKey) { cmds, apps, s -> Triple(cmds, apps, s) }
                 .debounce(500)
                 .collectLatest { (cmds, apps, s) ->
                     cachedCommands = cmds
-                    wakeWord = s.first
-                    pauseOnScreenOff = s.third
-                    val grammar = if (s.second && c.voice.supportsGrammar()) {
-                        GrammarBuilder.toJson(GrammarBuilder.phrases(s.first, cmds, apps))
+                    wakeWord = s.wakeWord
+                    pauseOnScreenOff = s.pauseOnScreenOff
+                    val grammar = if (s.useGrammar && c.voice.supportsGrammar()) {
+                        val online = s.onlineCommands && c.google.isAvailable()
+                        GrammarBuilder.toJson(
+                            if (online) GrammarBuilder.wakeOnlyPhrases(s.wakeWord, cmds)
+                            else GrammarBuilder.phrases(s.wakeWord, cmds, apps)
+                        )
                     } else null
                     startListening(grammar)
                     modelReady = true
@@ -242,6 +258,12 @@ class ListeningService : Service() {
             delay(COMMAND_WINDOW_MS)
             endWindow()
         }
+    }
+
+    /** Voice lock: true when no voice print is enrolled or the last utterance matches it. */
+    private fun speakerAllowed(): Boolean {
+        val print = voicePrint ?: return true
+        return c.speaker.matches(c.voice.lastSpeakerVector, print, voiceThreshold)
     }
 
     /** True when the whole utterance is (almost exactly) one of the user's triggers. */
@@ -295,6 +317,10 @@ class ListeningService : Service() {
         }
 
         val rest = afterWakeWord(text)
+        if ((rest != null || isDirectTrigger(text)) && !speakerAllowed()) {
+            c.log.info("صوت مش متعرّف عليه (قفل الصوت) — اتجاهل: \"$raw\"")
+            return
+        }
         if (rest == null) {
             // Custom triggers like "واحد" work even without the wake word.
             if (isDirectTrigger(text)) {

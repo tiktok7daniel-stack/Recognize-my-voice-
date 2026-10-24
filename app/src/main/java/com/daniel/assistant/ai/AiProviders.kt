@@ -32,7 +32,8 @@ class AiException(message: String) : Exception(message)
 
 enum class ProviderKind(val id: String, val title: String) {
     ANTHROPIC("anthropic", "Claude (Anthropic)"),
-    OPENAI_COMPATIBLE("openai", "أي API متوافق مع OpenAI / موديل محلي");
+    OPENAI_COMPATIBLE("openai", "أي API متوافق مع OpenAI / سيرفر محلي"),
+    ON_DEVICE("ondevice", "موديل جوه الموبايل (Gemma — من غير نت)");
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id } ?: ANTHROPIC

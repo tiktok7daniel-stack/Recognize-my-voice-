@@ -4,7 +4,7 @@ import com.daniel.assistant.voice.ArabicNormalizer
 import com.daniel.assistant.voice.FuzzyMatcher
 
 sealed interface Resolution {
-    data class Custom(val command: CustomCommand, val score: Double) : Resolution
+    data class Custom(val command: CustomCommand, val score: Double, val vars: Map<String, String> = emptyMap()) : Resolution
     data class System(val action: SysAction, val arg: String?) : Resolution
     /** A system command that needs free text (e.g. "اكتب") but none was heard. */
     data class NeedsArg(val action: SysAction) : Resolution
@@ -38,19 +38,27 @@ class CommandResolver(
             return Resolution.Cancel(heard)
         }
 
-        matchCustom(text, commands)?.let { return it }
+        matchCustom(text, commands, heard)?.let { return it }
         matchSystem(text)?.let { return it }
         matchOpenApp(text, apps)?.let { return it }
 
         return if (aiAvailable) Resolution.Ai(heard) else Resolution.Unknown(heard)
     }
 
-    fun matchCustom(text: String, commands: List<CustomCommand>): Resolution.Custom? {
+    fun matchCustom(text: String, commands: List<CustomCommand>, original: String = text): Resolution.Custom? {
+        // Triggers with {variables} first: "ابعت لـ {اسم} {رسالة}"
+        for (c in commands) {
+            if (!c.enabled) continue
+            for (t in c.triggers) {
+                Variables.match(t, original)?.let { return Resolution.Custom(c, 1.0, it) }
+            }
+        }
         var best: CustomCommand? = null
         var bestScore = 0.0
         for (c in commands) {
             if (!c.enabled) continue
             for (t in c.triggers) {
+                if (Variables.hasVariables(t)) continue
                 val n = ArabicNormalizer.normalize(t)
                 if (n.isBlank()) continue
                 val s = maxOf(
@@ -67,7 +75,7 @@ class CommandResolver(
             val words = text.split(' ')
             for (c in commands) {
                 if (!c.enabled) continue
-                if (c.triggers.any { t -> ArabicNormalizer.normalize(t).let { n -> n.isNotBlank() && !n.contains(' ') && n in words } }) {
+                if (c.triggers.filterNot(Variables::hasVariables).any { t -> ArabicNormalizer.normalize(t).let { n -> n.isNotBlank() && !n.contains(' ') && n in words } }) {
                     return Resolution.Custom(c, 0.9)
                 }
             }

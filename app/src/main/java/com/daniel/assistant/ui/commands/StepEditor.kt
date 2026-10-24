@@ -113,6 +113,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
             is Step.TypeText -> initial.text
             is Step.ClickText -> initial.text
             is Step.System -> initial.arg ?: ""
+            is Step.AttachPhotos -> initial.text ?: ""
             else -> ""
         }
     ) }
@@ -131,7 +132,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
 
     val result: Step? = when (type) {
         StepType.OPEN_APP -> app?.let { Step.OpenApp(it.packageName, it.label) }
-        StepType.ATTACH_PHOTOS -> app?.let { Step.AttachPhotos(count.roundToInt(), it.packageName, it.label) }
+        StepType.ATTACH_PHOTOS -> app?.let { Step.AttachPhotos(count.roundToInt(), it.packageName, it.label, text.takeIf { t -> t.isNotBlank() }) }
         StepType.TYPE_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.TypeText(it) }
         StepType.CLICK_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.ClickText(it.trim()) }
         StepType.WAIT -> Step.Wait(millis.roundToInt().toLong())
@@ -162,10 +163,14 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                                 value = count, onValueChange = { count = it }, valueRange = 1f..10f, steps = 8,
                                 colors = SliderDefaults.colors(thumbColor = Neo.Pill, activeTrackColor = Neo.Accent),
                             )
+                            NeoTextField(text, { text = it }, "نص يتبعت مع الصور (اختياري)")
                             Text("بيتبعتوا مباشرة للتطبيق بالمشاركة (أضمن من الضغط على الشاشة).", style = MaterialTheme.typography.bodySmall)
                         }
                     }
-                    StepType.TYPE_TEXT -> NeoTextField(text, { text = it }, "النص", singleLine = false)
+                    StepType.TYPE_TEXT -> {
+                        NeoTextField(text, { text = it }, "النص", singleLine = false)
+                        Text("تقدر تكتب متغير زي {رسالة} لو كلمة التشغيل فيها متغيرات.", style = MaterialTheme.typography.bodySmall)
+                    }
                     StepType.CLICK_TEXT -> NeoTextField(text, { text = it }, "النص أو الوصف اللي على الزرار")
                     StepType.WAIT -> {
                         Text("${millis.roundToInt()} ms")

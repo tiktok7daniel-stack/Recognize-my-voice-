@@ -21,7 +21,7 @@ object DemoSeeder {
                 name = "واحد — صور لكلود",
                 triggers = listOf("واحد"),
                 steps = listOf(
-                    Step.AttachPhotos(count = 2, packageName = pkg, label = label),
+                    Step.AttachPhotos(count = 2, packageName = pkg, label = label, text = DEMO_TEXT),
                     Step.Wait(1500),
                     Step.TypeText(DEMO_TEXT),
                     Step.PressSend,

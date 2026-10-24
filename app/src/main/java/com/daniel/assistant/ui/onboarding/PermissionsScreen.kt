@@ -55,6 +55,8 @@ private data class PermItem(
     val granted: Boolean,
     val essential: Boolean,
     val buttonText: String,
+    val extraText: String? = null,
+    val onExtra: (() -> Unit)? = null,
     val onClick: () -> Unit,
 )
 
@@ -82,6 +84,8 @@ fun PermissionsScreen(onContinue: () -> Unit, onBack: (() -> Unit)? = null) {
             "دي \"الإيدين\": بيها أقدر أضغط وأكتب وأعمل سكرول وأرجع وأفتح التطبيقات من الخلفية. " +
                 "لو الزرار رمادي (أندرويد 13+): ادخل معلومات التطبيق ← ⋮ ← \"السماح بالإعدادات المقيدة\".",
             Permissions.accessibility(context), true, "فعّل",
+            extraText = "الزرار رمادي؟ افتح معلومات Nabra",
+            onExtra = { open(Permissions.appDetails(context)) },
         ) { open(Permissions.accessibilityIntent()) },
         PermItem(
             Icons.Filled.Photo, "الصور",
@@ -129,6 +133,13 @@ fun PermissionsScreen(onContinue: () -> Unit, onBack: (() -> Unit)? = null) {
                             if (!p.granted) PillButton(p.buttonText, p.onClick, primary = p.essential)
                         }
                         Text(p.why, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp))
+                        if (!p.granted && p.extraText != null && p.onExtra != null) {
+                            TextButton(onClick = p.onExtra) { Text(p.extraText, color = Neo.Cyan) }
+                            Text(
+                                "في صفحة المعلومات: دوس ⋮ فوق ← \"Allow restricted settings\" ← وارجع فعّل.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
                 item {

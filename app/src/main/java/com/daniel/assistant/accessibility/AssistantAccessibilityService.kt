@@ -29,7 +29,10 @@ class AssistantAccessibilityService : AccessibilityService() {
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             event.packageName?.toString()?.let { pkg ->
                 // Ignore our own overlays and the system UI shade.
-                if (pkg != "com.android.systemui") foregroundPackage = pkg
+                if (pkg != "com.android.systemui" && pkg != packageName && pkg != foregroundPackage) {
+                    foregroundPackage = pkg
+                    _appOpened.tryEmit(pkg)
+                }
             }
         }
     }
@@ -69,6 +72,10 @@ class AssistantAccessibilityService : AccessibilityService() {
 
         @Volatile var foregroundPackage: String? = null
             private set
+
+        private val _appOpened = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+        /** Emits the package name each time a different app comes to the foreground. */
+        val appOpened: kotlinx.coroutines.flow.SharedFlow<String> = _appOpened
         @Volatile var lastEventAt: Long = 0
             private set
 

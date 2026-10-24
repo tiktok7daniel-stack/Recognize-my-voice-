@@ -11,7 +11,13 @@ sealed class Step {
     data class OpenApp(val packageName: String, val label: String) : Step()
 
     @Serializable @SerialName("attach_photos")
-    data class AttachPhotos(val count: Int, val packageName: String, val label: String) : Step()
+    data class AttachPhotos(
+        val count: Int,
+        val packageName: String,
+        val label: String,
+        /** Optional text shared together with the photos (pre-fills the message in many apps). */
+        val text: String? = null,
+    ) : Step()
 
     @Serializable @SerialName("type_text")
     data class TypeText(val text: String) : Step()
@@ -40,7 +46,7 @@ sealed class Step {
     /** Short Arabic description for lists and notifications. */
     fun describe(): String = when (this) {
         is OpenApp -> "افتح $label"
-        is AttachPhotos -> "ابعت آخر $count صور لـ $label"
+        is AttachPhotos -> "ابعت آخر $count صور لـ $label" + (text?.takeIf { it.isNotBlank() }?.let { " + \"$it\"" } ?: "")
         is TypeText -> "اكتب \"$text\""
         PressSend -> "دوس إرسال"
         is ClickText -> "اضغط على \"$text\""
@@ -93,6 +99,10 @@ data class CustomCommand(
     val enabled: Boolean = true,
     val triggers: List<String>,
     val steps: List<Step>,
+    /** Run automatically every day at this time ("HH:mm"), or null. */
+    val autoTime: String? = null,
+    /** Run automatically when this app (package) comes to the foreground, or null. */
+    val autoApp: String? = null,
 )
 
 object CommandJson {

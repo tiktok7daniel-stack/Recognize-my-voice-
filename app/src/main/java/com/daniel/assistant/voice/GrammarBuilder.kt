@@ -3,6 +3,7 @@ package com.daniel.assistant.voice
 import com.daniel.assistant.commands.AppEntry
 import com.daniel.assistant.commands.CustomCommand
 import com.daniel.assistant.commands.SysAction
+import com.daniel.assistant.commands.Variables
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -48,10 +49,29 @@ object GrammarBuilder {
         }
         for (c in commands) {
             if (!c.enabled) continue
-            c.triggers.forEach { t ->
+            c.triggers.forEach { raw ->
+                val t = Variables.literal(raw)
                 add(t)
                 add("$wakeWord $t")
             }
+        }
+        return out.toList()
+    }
+
+    /**
+     * Battery-saving grammar used when commands are recognized by the online engine:
+     * Vosk only has to spot the wake word, the user's direct triggers and "وقف".
+     */
+    fun wakeOnlyPhrases(wakeWord: String, commands: List<CustomCommand>): List<String> {
+        val out = LinkedHashSet<String>()
+        fun add(p: String) {
+            ArabicNormalizer.stripDiacritics(p).takeIf { it.isNotBlank() }?.let(out::add)
+            ArabicNormalizer.normalize(p).takeIf { it.isNotBlank() }?.let(out::add)
+        }
+        add(wakeWord)
+        SysAction.CANCEL_WORDS.forEach(::add)
+        commands.filter { it.enabled }.forEach { c ->
+            c.triggers.map(Variables::literal).forEach { add(it); add("$wakeWord $it") }
         }
         return out.toList()
     }

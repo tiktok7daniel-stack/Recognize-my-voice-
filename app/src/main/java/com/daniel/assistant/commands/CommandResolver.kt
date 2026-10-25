@@ -61,10 +61,7 @@ class CommandResolver(
                 if (Variables.hasVariables(t)) continue
                 val n = ArabicNormalizer.normalize(t)
                 if (n.isBlank()) continue
-                val s = maxOf(
-                    FuzzyMatcher.ratio(text, n),
-                    FuzzyMatcher.ratio(text.replace(" ", ""), n.replace(" ", "")),
-                )
+                val s = FuzzyMatcher.phoneticRatio(text, n)
                 if (s > bestScore) {
                     bestScore = s; best = c
                 }
@@ -96,14 +93,37 @@ class CommandResolver(
         val alts = alternatives.filter { it.isNotBlank() }
         if (alts.isEmpty()) return "" to Resolution.Unknown("")
         val resolved = alts.map { it to resolve(it, commands, apps, aiAvailable = false) }
-        resolved.firstOrNull { it.second is Resolution.Custom }?.let { return it }
+        // Strongest custom match wins (earlier alternative on ties).
+        resolved.filter { it.second is Resolution.Custom }
+            .maxByOrNull { (it.second as Resolution.Custom).score }
+            ?.let { return it }
         resolved.firstOrNull { it.second is Resolution.Cancel }?.let { return it }
+        resolved.filter { it.second is Resolution.OpenApp }
+            .maxByOrNull { (it.second as Resolution.OpenApp).score }
+            ?.let { return it }
         resolved.firstOrNull {
             it.second !is Resolution.Unknown && it.second !is Resolution.OpenAppUnknown
         }?.let { return it }
         resolved.firstOrNull { it.second is Resolution.OpenAppUnknown }?.let { return it }
         val top = alts.first()
         return top to (if (aiAvailable) Resolution.Ai(top) else Resolution.Unknown(top))
+    }
+
+    /**
+     * Fast check used on partial (still-being-spoken) results: true only when the text is
+     * already an unambiguous command, so it can run before the user finishes the sentence.
+     */
+    fun isConfidentEarly(text: String, commands: List<CustomCommand>): Boolean {
+        val t = ArabicNormalizer.normalize(text)
+        if (t.isBlank()) return false
+        for (c in commands) {
+            if (!c.enabled) continue
+            for (tr in c.triggers) {
+                if (Variables.hasVariables(tr)) continue
+                if (ArabicNormalizer.phonetic(tr) == ArabicNormalizer.phonetic(t)) return true
+            }
+        }
+        return SysAction.entries.any { a -> !a.takesArg && a.phrases.any { ArabicNormalizer.phonetic(it) == ArabicNormalizer.phonetic(t) } }
     }
 
     fun matchSystem(text: String): Resolution? {
@@ -124,7 +144,7 @@ class CommandResolver(
         for (a in SysAction.entries) {
             if (a.takesArg) continue
             for (p in a.phrases) {
-                val s = FuzzyMatcher.ratio(text, ArabicNormalizer.normalize(p))
+                val s = FuzzyMatcher.phoneticRatio(text, ArabicNormalizer.normalize(p))
                 if (s > bestScore) {
                     bestScore = s; best = a
                 }

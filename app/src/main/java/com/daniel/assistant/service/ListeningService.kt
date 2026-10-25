@@ -107,6 +107,9 @@ class ListeningService : Service() {
     private var cachedCommands: List<com.daniel.assistant.commands.CustomCommand> = emptyList()
     private var pendingListenNow = false
     private var modelReady = false
+    /** Wake word was already acted on from a partial result; skip it in the final one. */
+    private var wakeFromPartial = false
+    private var wakeFromPartialAt = 0L
     private lateinit var bubble: FloatingBubble
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -282,7 +285,10 @@ class ListeningService : Service() {
             VoiceEngine.Continuous(
                 grammar = grammar,
                 onResult = ::onResult,
-                onPartial = { p -> _state.value = _state.value.copy(partial = p) },
+                onPartial = { p ->
+                    _state.value = _state.value.copy(partial = p)
+                    checkPartialWake(p)
+                },
                 onError = { e ->
                     c.log.error("خطأ في الميكروفون: ${e.message}")
                     scope.launch {
@@ -296,9 +302,36 @@ class ListeningService : Service() {
         applyPause()
     }
 
+    /**
+     * React to the wake word while it's still being spoken (partial result) instead of
+     * waiting for the end-of-utterance silence — saves ~0.5–1 s per command.
+     * Disabled with voice lock (the voice print only comes with final results).
+     */
+    private fun checkPartialWake(partial: String) {
+        if (wakeFromPartial || voicePrint != null || _state.value.awaitingCommand) return
+        if (listenJob?.isActive == true || c.executor.running.value != null || c.ai.running.value) return
+        val rest = afterWakeWord(ArabicNormalizer.normalize(partial)) ?: return
+        if (rest.isNotBlank()) return // wake word + command in one breath: let the final result carry it
+        wakeFromPartial = true
+        wakeFromPartialAt = android.os.SystemClock.uptimeMillis()
+        c.brain.setHeard(partial)
+        startCommandCapture()
+    }
+
     private fun onResult(raw: String) {
         val text = ArabicNormalizer.normalize(raw)
         _state.value = _state.value.copy(partial = "")
+        c.brain.markSpeechEnd()
+        if (wakeFromPartial && android.os.SystemClock.uptimeMillis() - wakeFromPartialAt > 4_000) wakeFromPartial = false
+        if (wakeFromPartial) {
+            wakeFromPartial = false
+            val rest = afterWakeWord(text)
+            if (rest.isNullOrBlank() || rest == "[unk]") return // already handled from the partial
+            if (_state.value.awaitingCommand) {
+                endWindow(); dispatch(rest)
+            }
+            return
+        }
         if (text.isBlank() || text == "[unk]" && !_state.value.awaitingCommand) return
 
         // While a command or AI task runs, only listen for "وقف".

@@ -105,6 +105,19 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
   Vosk only listens for the wake word, your triggers, and "وقف".
 * **Size**: the build is arm64-only and runs R8 shrinking (no obfuscation).
 
+## Speed and accuracy
+
+* The wake word triggers from **partial** Vosk results, while you are still saying it,
+  instead of waiting for end-of-utterance silence.
+* **Early accept**: if a partial Google result is already an exact trigger or system
+  command, listening stops and the command runs right away.
+* The Google recognizer instance is **kept warm**, the end-of-speech silence is shorter
+  (700 ms), and commands, apps and bias phrases are cached in memory.
+* **Matching**: digits are mapped to Egyptian number words ("1" → "واحد"), pronunciation
+  is folded (ث→ت, ذ→د, ظ→ض), and the highest-scoring of the 5 alternatives wins.
+* UI steps poll every 80 ms. The demo wait is 0.8 s.
+* **⏱ readout**: Home and the Log show the response time, from end of speech to action.
+
 ## How it works
 
 ```

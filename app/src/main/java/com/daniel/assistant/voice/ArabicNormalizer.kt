@@ -35,7 +35,32 @@ object ArabicNormalizer {
             )
         }
         s = punctuation.replace(sb.toString(), " ")
-        return spaces.replace(s, " ").trim()
+        s = spaces.replace(s, " ").trim()
+        // Speech engines often write small numbers as digits ("واحد" → "1").
+        return s.split(' ').joinToString(" ") { numberWords[it] ?: it }
+    }
+
+    private val numberWords = mapOf(
+        "0" to "صفر", "1" to "واحد", "2" to "اتنين", "3" to "تلاته", "4" to "اربعه", "5" to "خمسه",
+        "6" to "سته", "7" to "سبعه", "8" to "تمانيه", "9" to "تسعه", "10" to "عشره",
+    )
+
+    /**
+     * Egyptian pronunciation folding on top of [normalize]: ث→ت, ذ→د, ظ→ض, so MSA spellings
+     * from the recognizer ("اثنين", "ذهب") match colloquial ones ("اتنين", "دهب").
+     */
+    fun phonetic(input: String): String {
+        val n = normalize(input)
+        val sb = StringBuilder(n.length)
+        for (c in n) sb.append(
+            when (c) {
+                'ث' -> 'ت'
+                'ذ' -> 'د'
+                'ظ' -> 'ض'
+                else -> c
+            }
+        )
+        return sb.toString()
     }
 
     /** Removes diacritics only (keeps hamza forms) — used for grammar phrases. */

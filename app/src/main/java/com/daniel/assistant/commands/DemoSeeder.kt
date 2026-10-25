@@ -9,7 +9,9 @@ object DemoSeeder {
 
     suspend fun seedIfNeeded(c: AppContainer) {
         migrateDemoText(c)
-        if (c.settings.current().demoSeeded) return
+        if (c.settings.current().demoSeeded) {
+            migrateDemoWait(c); return
+        }
         val apps = c.appEntries()
         // Resolve Claude at runtime instead of trusting a hardcoded package name.
         val claude = apps.firstOrNull { it.packageName == "com.anthropic.claude" }
@@ -22,7 +24,7 @@ object DemoSeeder {
                 triggers = listOf("واحد"),
                 steps = listOf(
                     Step.AttachPhotos(count = 2, packageName = pkg, label = label, text = DEMO_TEXT),
-                    Step.Wait(1500),
+                    Step.Wait(800),
                     Step.TypeText(DEMO_TEXT),
                     Step.PressSend,
                 ),
@@ -30,6 +32,18 @@ object DemoSeeder {
         )
         c.settings.setDemoSeeded(true)
         c.settings.setDemoTextV2(true)
+        c.settings.setDemoV3(true)
+    }
+
+    /** Faster demo: the typing step already waits for the text field, so 1.5 s → 0.8 s. */
+    private suspend fun migrateDemoWait(c: AppContainer) {
+        if (c.settings.current().demoV3) return
+        c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
+            if (cmd.steps.any { it == Step.Wait(1500) }) {
+                c.repo.save(cmd.copy(steps = cmd.steps.map { if (it == Step.Wait(1500)) Step.Wait(800) else it }))
+            }
+        }
+        c.settings.setDemoV3(true)
     }
 
     /** Updates the demo created by older versions ("حلهم") to the new text, unless the user edited it. */

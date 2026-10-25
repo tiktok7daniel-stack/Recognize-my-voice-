@@ -169,7 +169,7 @@ class CommandExecutor(
             val s = service() ?: return null
             runCatching { block(s) }.getOrNull()?.let { return it }
             if (SystemClock.uptimeMillis() >= end) return null
-            delay(150)
+            delay(80)
         }
     }
 

@@ -23,6 +23,13 @@ object FuzzyMatcher {
         return prev[b.length]
     }
 
+    /** Best of plain / space-insensitive / pronunciation-folded ratio on already-normalized text. */
+    fun phoneticRatio(a: String, b: String): Double = maxOf(
+        ratio(a, b),
+        ratio(a.replace(" ", ""), b.replace(" ", "")),
+        ratio(ArabicNormalizer.phonetic(a), ArabicNormalizer.phonetic(b)) * 0.98,
+    )
+
     fun ratio(a: String, b: String): Double {
         val len = max(a.length, b.length)
         if (len == 0) return 1.0
@@ -40,10 +47,11 @@ object FuzzyMatcher {
         if (a == b) return 1.0
         val r1 = ratio(a, b)
         val r2 = ratio(a.replace(" ", ""), b.replace(" ", ""))
+        val r3 = ratio(ArabicNormalizer.phonetic(a), ArabicNormalizer.phonetic(b)) * 0.98
         val shorter = if (a.length <= b.length) a else b
         val longer = if (a.length <= b.length) b else a
         val contain = if (shorter.length >= 3 && containsWord(longer, shorter)) 0.9 else 0.0
-        return maxOf(r1, r2, contain)
+        return maxOf(r1, r2, r3, contain)
     }
 
     private fun containsWord(longer: String, shorter: String): Boolean {

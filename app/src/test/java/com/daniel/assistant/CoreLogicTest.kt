@@ -182,3 +182,32 @@ class VariablesTest {
         assertEquals(Step.ClickText("ماما"), steps[0])
     }
 }
+
+class SpeedAccuracyTest {
+    private val resolver = CommandResolver()
+    private val one = CustomCommand(id = 1, name = "واحد", triggers = listOf("واحد"), steps = listOf(Step.Home))
+    private val two = CustomCommand(id = 2, name = "اتنين", triggers = listOf("اتنين"), steps = listOf(Step.Back))
+
+    @Test fun digitsMatchNumberTriggers() {
+        assertTrue(resolver.resolve("1", listOf(one, two), emptyList(), false).let { it is Resolution.Custom && it.command.id == 1L })
+        assertTrue(resolver.resolve("٢", listOf(one, two), emptyList(), false).let { it is Resolution.Custom && it.command.id == 2L })
+    }
+
+    @Test fun msaSpellingMatchesEgyptian() {
+        val r = resolver.resolve("اثنين", listOf(one, two), emptyList(), false)
+        assertTrue(r is Resolution.Custom && r.command.id == 2L)
+    }
+
+    @Test fun bestAlternativeByScore() {
+        val (text, r) = resolver.resolveBest(listOf("واحده", "واحد"), listOf(one), emptyList(), false)
+        assertEquals("واحد", text)
+        assertTrue(r is Resolution.Custom)
+    }
+
+    @Test fun earlyConfidence() {
+        assertTrue(resolver.isConfidentEarly("واحد", listOf(one)))
+        assertTrue(resolver.isConfidentEarly("رجوع", emptyList()))
+        assertTrue(!resolver.isConfidentEarly("افتح يو", listOf(one)))
+        assertTrue(!resolver.isConfidentEarly("واحد كمان", listOf(one)))
+    }
+}

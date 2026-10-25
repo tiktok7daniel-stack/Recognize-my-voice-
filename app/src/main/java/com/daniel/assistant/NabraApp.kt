@@ -88,6 +88,8 @@ class AppContainer(val app: Application) {
 
     fun init() {
         notifier.createChannels()
+        brain.attachCaches(scope)
+        google.warmUp()
         scope.launch {
             settings.flow.collect { s ->
                 feedback.ttsEnabled = s.ttsEnabled

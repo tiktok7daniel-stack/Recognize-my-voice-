@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Turns a heard (or typed) command into an action, following the resolution priority. */
@@ -30,6 +31,28 @@ class AssistantBrain(private val c: AppContainer) {
 
     fun setHeard(text: String) { _lastHeard.value = text }
 
+    // Live caches so resolving a command never waits on the database.
+    @Volatile private var cachedCommands: List<com.daniel.assistant.commands.CustomCommand> = emptyList()
+    @Volatile private var cachedApps: List<com.daniel.assistant.commands.AppEntry> = emptyList()
+    @Volatile private var cachedBias: List<String> = emptyList()
+
+    fun attachCaches(scope: kotlinx.coroutines.CoroutineScope) {
+        scope.launch {
+            kotlinx.coroutines.flow.combine(c.repo.commands, c.appEntriesFlow) { cmds, apps -> cmds to apps }
+                .collect { (cmds, apps) ->
+                    cachedCommands = cmds
+                    cachedApps = apps
+                    cachedBias = buildBias(cmds, apps)
+                }
+        }
+    }
+
+    private suspend fun commands() = cachedCommands.ifEmpty { c.repo.all() }
+    private suspend fun apps() = cachedApps.ifEmpty { c.appEntries() }
+
+    /** Uptime of the moment speech ended for the current command (for the response-time readout). */
+    @Volatile private var speechEndAt = 0L
+
     fun cancelAll() {
         c.executor.cancel()
         c.ai.cancel()
@@ -39,11 +62,14 @@ class AssistantBrain(private val c: AppContainer) {
         c.settings.current().commandEngine == "google" && c.google.isAvailable()
 
     /** Phrases that bias the online recognizer toward things the user actually says. */
-    private suspend fun biasPhrases(): List<String> {
+    private fun buildBias(
+        cmds: List<com.daniel.assistant.commands.CustomCommand>,
+        apps: List<com.daniel.assistant.commands.AppEntry>,
+    ): List<String> {
         val out = mutableListOf<String>()
-        c.repo.all().filter { it.enabled }.forEach { cmd -> out.addAll(cmd.triggers.map(Variables::literal)) }
+        cmds.filter { it.enabled }.forEach { cmd -> out.addAll(cmd.triggers.map(Variables::literal)) }
         SysAction.entries.forEach { out.addAll(it.phrases) }
-        c.appEntries().forEach { app ->
+        apps.forEach { app ->
             app.spokenNames.filter { ArabicNormalizer.isArabic(it) }.take(2).forEach { out.add("افتح $it") }
         }
         return out
@@ -63,9 +89,18 @@ class AssistantBrain(private val c: AppContainer) {
         if (!usesGoogle()) return false
         _listening.value = true
         _partial.value = ""
+        val early = CommandResolver()
+        val cmds = commands()
         val alts = try {
-            c.voice.withMicReleased { c.google.capture(biasPhrases(), 9_000) { _partial.value = it } }
+            c.voice.withMicReleased {
+                c.google.capture(
+                    bias = cachedBias,
+                    timeoutMs = 9_000,
+                    earlyAccept = { p -> early.isConfidentEarly(p, cmds) },
+                ) { _partial.value = it }
+            }
         } finally {
+            speechEndAt = c.google.lastSpeechEndAt
             _listening.value = false
             _partial.value = ""
         }
@@ -121,7 +156,7 @@ class AssistantBrain(private val c: AppContainer) {
         val (heard, res) = if (alternatives.size == 1 && (norm.isBlank() || norm == "[unk]") && grammarMode && aiAvailable) {
             top to Resolution.Ai("")
         } else {
-            resolver.resolveBest(alternatives, c.repo.all(), c.appEntries(), aiAvailable)
+            resolver.resolveBest(alternatives, commands(), apps(), aiAvailable)
         }
         _lastHeard.value = heard.ifBlank { top }
         execute(res, heard.ifBlank { top }, grammarMode)
@@ -195,5 +230,14 @@ class AssistantBrain(private val c: AppContainer) {
         }
     }
 
-    private fun result(text: String) { _lastResult.value = text }
+    private fun result(text: String) {
+        val end = speechEndAt
+        speechEndAt = 0
+        val ms = if (end > 0) android.os.SystemClock.uptimeMillis() - end else -1
+        _lastResult.value = if (ms in 0..15_000) "$text  •  ⏱ ${"%.1f".format(ms / 1000.0)} ث" else text
+        if (ms in 0..15_000) c.log.info("⏱ زمن الاستجابة ${ms}ms — $text")
+    }
+
+    /** Called by the listener when the offline engine finished an utterance. */
+    fun markSpeechEnd() { speechEndAt = android.os.SystemClock.uptimeMillis() }
 }

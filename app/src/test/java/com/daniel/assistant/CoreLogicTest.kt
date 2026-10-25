@@ -85,8 +85,8 @@ class CoreLogicTest {
     }
 
     @Test fun aiFallbackAndCancel() {
-        assertTrue(resolver.resolve("ابعت لماما اني جاي", emptyList(), apps, true) is Resolution.Ai)
-        assertTrue(resolver.resolve("ابعت لماما اني جاي", emptyList(), apps, false) is Resolution.Unknown)
+        assertTrue(resolver.resolve("احجزلي تذكرة طيران للغردقة", emptyList(), apps, true) is Resolution.Ai)
+        assertTrue(resolver.resolve("احجزلي تذكرة طيران للغردقة", emptyList(), apps, false) is Resolution.Unknown)
         assertTrue(resolver.resolve("وقف", emptyList(), apps, true) is Resolution.Cancel)
     }
 
@@ -149,7 +149,7 @@ class RecognitionUpgradeTest {
         assertEquals("افتح يوتيوب", t2)
         assertTrue(r2 is Resolution.OpenApp)
         val (_, r3) = resolver.resolveBest(listOf("ابعت رسالة لاحمد"), emptyList(), apps, aiAvailable = true)
-        assertTrue(r3 is Resolution.Ai)
+        assertTrue(r3 is Resolution.Skill || r3 is Resolution.Ai)
     }
 
     @Test fun buckwalterOutputIsConverted() {
@@ -209,5 +209,58 @@ class SpeedAccuracyTest {
         assertTrue(resolver.isConfidentEarly("رجوع", emptyList()))
         assertTrue(!resolver.isConfidentEarly("افتح يو", listOf(one)))
         assertTrue(!resolver.isConfidentEarly("واحد كمان", listOf(one)))
+    }
+}
+
+class IntentParserTest {
+    private fun p(s: String) = com.daniel.assistant.skills.IntentParser.parse(s, "يا مساعد")
+
+    @Test fun messengerMessage() {
+        val m = p("كلم محمد على الماسنجر وقوله محمد انا مش عارف اجي النهارده عشان عندي مشكلة") as com.daniel.assistant.skills.SkillIntent.Message
+        assertEquals("محمد", m.contact)
+        assertEquals(com.daniel.assistant.skills.ChatApp.MESSENGER, m.app)
+        assertEquals("محمد انا مش عارف اجي النهارده عشان عندي مشكلة", m.text)
+    }
+
+    @Test fun whatsappAndNoApp() {
+        val m = p("يا مساعد ابعت لأحمد على الواتس انا جاي في الطريق") as com.daniel.assistant.skills.SkillIntent.Message
+        assertEquals("أحمد", m.contact)
+        assertEquals(com.daniel.assistant.skills.ChatApp.WHATSAPP, m.app)
+        assertEquals("انا جاي في الطريق", m.text)
+        val n = p("قول لماما اني هتأخر شوية") as com.daniel.assistant.skills.SkillIntent.Message
+        assertEquals("ماما", n.contact)
+        assertEquals(null, n.app)
+    }
+
+    @Test fun callAlarmTimer() {
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Call("محمد"), p("اتصل بمحمد"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Call("ماما"), p("كلم ماما"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Alarm(7, 30), p("صحيني الساعة ٧ ونص"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Alarm(21, 0), p("صحيني الساعة تسعة بالليل"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Timer(300), p("تايمر ٥ دقايق"))
+    }
+
+    @Test fun searchNavigateLevelsToggles() {
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Search("اغاني عمرو دياب", com.daniel.assistant.skills.SearchTarget.YOUTUBE), p("دور على اغاني عمرو دياب في يوتيوب"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Navigate("مدينة نصر"), p("وديني مدينة نصر"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Volume(50), p("خلي الصوت ٥٠"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Toggle(com.daniel.assistant.skills.ToggleTarget.WIFI, true), p("شغل الواي فاي"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Toggle(com.daniel.assistant.skills.ToggleTarget.BLUETOOTH, false), p("اقفل البلوتوث"))
+        assertEquals(null, p("واحد"))
+    }
+}
+
+class AiIntentTest {
+    @Test fun parsesAiIntents() {
+        val m = com.daniel.assistant.skills.AiIntent.parse("""{"intent":"message","app":"messenger","contact":"محمد","text":"مش هقدر اجي"}""")
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Message("محمد", "مش هقدر اجي", com.daniel.assistant.skills.ChatApp.MESSENGER), m)
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Chat("القاهرة"), com.daniel.assistant.skills.AiIntent.parse("sure {\"intent\":\"chat\",\"answer\":\"القاهرة\"}"))
+        assertEquals(com.daniel.assistant.skills.SkillIntent.Alarm(6, 0), com.daniel.assistant.skills.AiIntent.parse("""{"intent":"alarm","hour":6}"""))
+        assertEquals(null, com.daniel.assistant.skills.AiIntent.parse("no json here"))
+    }
+
+    @Test fun resolverRoutesSkills() {
+        val r = CommandResolver().resolve("كلم محمد على الماسنجر وقوله انا جاي", emptyList(), emptyList(), aiAvailable = true)
+        assertTrue(r is Resolution.Skill)
     }
 }

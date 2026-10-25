@@ -20,6 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BrightnessMedium
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
@@ -100,6 +103,21 @@ fun PermissionsScreen(onContinue: () -> Unit, onBack: (() -> Unit)? = null) {
             if (Build.VERSION.SDK_INT >= 33) requestOne.launch(Manifest.permission.POST_NOTIFICATIONS)
             else open(Permissions.notificationSettings(context))
         },
+        PermItem(
+            Icons.Filled.Contacts, "جهات الاتصال",
+            "عشان \"كلّم محمد\" و\"ابعت لأحمد على الواتس…\" — بدوّر على الاسم في الأسماء اللي عندك بس.",
+            Permissions.contacts(context), false, "اسمح",
+        ) { requestOne.launch(Manifest.permission.READ_CONTACTS) },
+        PermItem(
+            Icons.Filled.Call, "المكالمات",
+            "عشان \"اتصل بماما\" تتصل على طول. من غيرها هفتحلك الطالب والرقم مكتوب.",
+            Permissions.calls(context), false, "اسمح",
+        ) { requestOne.launch(Manifest.permission.CALL_PHONE) },
+        PermItem(
+            Icons.Filled.BrightnessMedium, "تعديل إعدادات النظام",
+            "عشان \"خلي الإضاءة ٥٠\".",
+            Permissions.writeSettings(context), false, "اسمح",
+        ) { open(Permissions.writeSettingsIntent(context)) },
         PermItem(
             Icons.Filled.BatteryChargingFull, "تجاهل توفير البطارية",
             "عشان النظام ميقفلش المساعد وهو بيسمعك في الخلفية.",

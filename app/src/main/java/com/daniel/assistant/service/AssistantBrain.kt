@@ -212,9 +212,9 @@ class AssistantBrain(private val c: AppContainer) {
                     _lastHeard.value = command
                     if (SysAction.CANCEL_WORDS.any { ArabicNormalizer.normalize(it) == ArabicNormalizer.normalize(command) }) return
                 }
-                result("ذكاء اصطناعي: $command")
-                c.ai.start(command)
+                handleFreeText(command)
             }
+            is Resolution.Skill -> handleSkill(res.intent)
             is Resolution.Cancel -> {
                 cancelAll()
                 c.feedback.say("وقفت")
@@ -226,6 +226,41 @@ class AssistantBrain(private val c: AppContainer) {
                 c.feedback.say("مفهمتش")
                 c.notifier.notUnderstood(heard)
                 c.log.info("مش مفهوم: \"$heard\"")
+            }
+        }
+    }
+
+    /**
+     * Free sentence: known Egyptian patterns run instantly offline; otherwise the AI
+     * (on-device or online) turns it into an intent; long screen tasks go to the agent loop.
+     */
+    private suspend fun handleFreeText(command: String) {
+        com.daniel.assistant.skills.IntentParser.parse(command)?.let { handleSkill(it); return }
+        result("بفكر…")
+        when (val intent = c.ai.understand(command)) {
+            null -> {
+                result("ذكاء اصطناعي: $command")
+                c.ai.start(command)
+            }
+            else -> handleSkill(intent)
+        }
+    }
+
+    private fun handleSkill(intent: com.daniel.assistant.skills.SkillIntent) {
+        when (intent) {
+            is com.daniel.assistant.skills.SkillIntent.Chat -> {
+                result(intent.answer)
+                c.feedback.say(intent.answer)
+                c.notifier.info("Nabra", intent.answer)
+                c.log.info("رد: ${intent.answer}")
+            }
+            is com.daniel.assistant.skills.SkillIntent.Task -> {
+                result("ذكاء اصطناعي: ${intent.goal}")
+                c.ai.start(intent.goal)
+            }
+            else -> {
+                result(c.skills.describe(intent))
+                c.skills.run(intent)
             }
         }
     }

@@ -123,6 +123,42 @@ object NodeActions {
         return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
+    private val SEARCH_WORDS = listOf("search", "بحث", "ابحث", "cerca", "recherche", "buscar", "suche")
+
+    /** A search icon / box in a chat app. */
+    fun findSearch(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        val nodes = visibleNodes(root)
+        return nodes.firstOrNull { n ->
+            val labels = listOfNotNull(n.contentDescription, n.text, n.hintText, n.viewIdResourceName?.substringAfterLast('/'))
+            labels.any { l -> val s = l.toString().lowercase(); SEARCH_WORDS.any { s.contains(it) } } &&
+                (n.isClickable || n.isEditable || clickableParent(n) != null)
+        }
+    }
+
+    /** The visible (non-editable) node whose text best matches [name] — e.g. a contact in search results. */
+    fun findBestTextMatch(root: AccessibilityNodeInfo?, name: String, minScore: Double = 0.6): AccessibilityNodeInfo? {
+        var best: AccessibilityNodeInfo? = null
+        var bestScore = minScore
+        visibleNodes(root).forEach { n ->
+            if (n.isEditable) return@forEach
+            val t = n.text?.toString()?.takeIf { it.isNotBlank() } ?: n.contentDescription?.toString() ?: return@forEach
+            if (t.length > 60) return@forEach
+            val sc = maxOf(
+                com.daniel.assistant.voice.FuzzyMatcher.score(name, t),
+                com.daniel.assistant.voice.FuzzyMatcher.score(name, com.daniel.assistant.voice.Transliterator.toArabic(t)),
+            )
+            if (sc > bestScore) { bestScore = sc; best = n }
+        }
+        return best
+    }
+
+    /** First on/off switch on screen (Wi-Fi / Bluetooth panels). */
+    fun findSwitch(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? =
+        visibleNodes(root).firstOrNull { n ->
+            val cls = n.className?.toString().orEmpty()
+            n.isCheckable && (cls.contains("Switch") || cls.contains("Toggle") || cls.contains("CheckBox"))
+        } ?: visibleNodes(root).firstOrNull { it.isCheckable }
+
     /** Puts [text] on the clipboard and pastes it into [node]. */
     fun pasteText(context: android.content.Context, node: AccessibilityNodeInfo, text: String): Boolean {
         val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager

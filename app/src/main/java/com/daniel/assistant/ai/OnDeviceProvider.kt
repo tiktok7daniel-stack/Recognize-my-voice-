@@ -41,6 +41,35 @@ class OnDeviceProvider(private val context: Context, private val modelPath: Stri
             }
         }
 
+        /** Downloads a .task model from a direct URL into the app (with progress). */
+        suspend fun download(context: Context, url: String, onProgress: (Long, Long) -> Unit): Boolean =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val http = okhttp3.OkHttpClient.Builder().readTimeout(60, java.util.concurrent.TimeUnit.SECONDS).build()
+                    val dest = modelFile(context).apply { parentFile?.mkdirs() }
+                    val tmp = File(dest.parentFile, "download.tmp")
+                    http.newCall(okhttp3.Request.Builder().url(url.trim()).build()).execute().use { resp ->
+                        if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                        val body = resp.body ?: error("empty")
+                        val total = body.contentLength()
+                        var done = 0L
+                        tmp.outputStream().use { out ->
+                            body.byteStream().use { input ->
+                                val buf = ByteArray(1 shl 16)
+                                while (true) {
+                                    val n = input.read(buf); if (n < 0) break
+                                    out.write(buf, 0, n); done += n
+                                    if (done % (1 shl 22) < (1 shl 16)) onProgress(done, total)
+                                }
+                            }
+                        }
+                    }
+                    release()
+                    dest.delete()
+                    tmp.renameTo(dest)
+                }.getOrDefault(false)
+            }
+
         fun release() {
             engine?.close()
             engine = null

@@ -60,6 +60,8 @@ class AppContainer(val app: Application) {
     val ai = AiAgent(app, settings, feedback, notifier, log, voice, executor, scope, ::appEntries)
     val brain = AssistantBrain(this)
     val automations = Automations(app)
+    val skills = com.daniel.assistant.skills.SkillRunner(app, this)
+    val telegram = com.daniel.assistant.service.TelegramRemote(this)
     private val overlay = ExecutionOverlay(app) { brain.cancelAll(); feedback.say("وقفت") }
 
     /** Installed apps merged with user aliases, as a live flow for the UI. */
@@ -89,6 +91,7 @@ class AppContainer(val app: Application) {
     fun init() {
         notifier.createChannels()
         brain.attachCaches(scope)
+        telegram.attach(scope)
         google.warmUp()
         scope.launch {
             settings.flow.collect { s ->

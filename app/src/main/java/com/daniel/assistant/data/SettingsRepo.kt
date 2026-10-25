@@ -41,6 +41,10 @@ data class AppSettings(
     val demoV4: Boolean = false,
     /** Run direct triggers the moment the word is recognized (partial result), not after the pause. */
     val instantTriggers: Boolean = true,
+    val telegramEnabled: Boolean = false,
+    val telegramTokenEnc: String = "",
+    val telegramChatId: String = "",
+    val telegramPairCode: String = "",
     /** How long the recognized trigger must stay unchanged before firing (0 = immediately). */
     val instantDelayMs: Int = 150,
     /** "google" (Android speech, most accurate for Egyptian Arabic) or "vosk" (fully offline). */
@@ -80,6 +84,10 @@ class SettingsRepo(private val context: Context) {
         val demoV3 = booleanPreferencesKey("demo_v3")
         val demoV4 = booleanPreferencesKey("demo_v4")
         val instant = booleanPreferencesKey("instant_triggers")
+        val tgEnabled = booleanPreferencesKey("tg_enabled")
+        val tgToken = stringPreferencesKey("tg_token_enc")
+        val tgChat = stringPreferencesKey("tg_chat")
+        val tgCode = stringPreferencesKey("tg_code")
         val instantDelay = androidx.datastore.preferences.core.intPreferencesKey("instant_delay_ms")
         val engine = stringPreferencesKey("command_engine")
         val direct = booleanPreferencesKey("direct_triggers")
@@ -115,6 +123,10 @@ class SettingsRepo(private val context: Context) {
             demoV3 = p[K.demoV3] ?: d.demoV3,
             demoV4 = p[K.demoV4] ?: d.demoV4,
             instantTriggers = p[K.instant] ?: d.instantTriggers,
+            telegramEnabled = p[K.tgEnabled] ?: d.telegramEnabled,
+            telegramTokenEnc = p[K.tgToken] ?: d.telegramTokenEnc,
+            telegramChatId = p[K.tgChat] ?: d.telegramChatId,
+            telegramPairCode = p[K.tgCode] ?: d.telegramPairCode,
             instantDelayMs = p[K.instantDelay] ?: d.instantDelayMs,
             commandEngine = p[K.engine] ?: d.commandEngine,
             directTriggers = p[K.direct] ?: d.directTriggers,
@@ -154,6 +166,17 @@ class SettingsRepo(private val context: Context) {
     suspend fun setDemoV3(v: Boolean) = edit { it[K.demoV3] = v }
     suspend fun setDemoV4(v: Boolean) = edit { it[K.demoV4] = v }
     suspend fun setInstantTriggers(v: Boolean) = edit { it[K.instant] = v }
+    suspend fun setTelegramEnabled(v: Boolean) = edit { it[K.tgEnabled] = v }
+    suspend fun setTelegramChatId(v: String) = edit { it[K.tgChat] = v }
+    suspend fun setTelegramToken(plain: String) = edit {
+        it[K.tgToken] = if (plain.isBlank()) "" else SecureKeyStore.encrypt(plain.trim())
+        it[K.tgChat] = ""
+        it[K.tgCode] = (100000..999999).random().toString()
+    }
+    suspend fun telegramToken(): String {
+        val enc = current().telegramTokenEnc
+        return if (enc.isBlank()) "" else runCatching { SecureKeyStore.decrypt(enc) }.getOrDefault("")
+    }
     suspend fun setInstantDelay(v: Int) = edit { it[K.instantDelay] = v }
     suspend fun setCommandEngine(v: String) = edit { it[K.engine] = v }
     suspend fun setDirectTriggers(v: Boolean) = edit { it[K.direct] = v }

@@ -97,6 +97,7 @@ fun SettingsScreen(
     fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
     var localCopy by remember { mutableStateOf<String?>(null) }
+    var llmUrl by remember { mutableStateOf("") }
     var pickListenButton by remember { mutableStateOf(false) }
     val llmPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -292,16 +293,47 @@ fun SettingsScreen(
                         PillButton("اختار ملف الموديل (.task)", {
                             llmPicker.launch(arrayOf("*/*"))
                         }, primary = !f.exists())
+                        Spacer(Modifier.height(6.dp))
+                        NeoTextField(llmUrl, { llmUrl = it }, "أو حط لينك مباشر لملف .task")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PillButton("نزّل من اللينك", {
+                                scope.launch {
+                                    localCopy = "بنزّل…"
+                                    val ok = com.daniel.assistant.ai.OnDeviceProvider.download(context, llmUrl) { done, total ->
+                                        localCopy = "بنزّل… ${done / (1024 * 1024)}" + (if (total > 0) " / ${total / (1024 * 1024)} MB" else " MB")
+                                    }
+                                    localCopy = if (ok) "اتنزل ✅" else "فشل التحميل — جرّب تنزّله من المتصفح وتختاره"
+                                }
+                            }, enabled = llmUrl.startsWith("http"), primary = false)
+                            androidx.compose.material3.TextButton(onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://huggingface.co/litert-community"))
+                                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            }) { Text("صفحة الموديلات", color = Neo.Cyan) }
+                        }
                         Text(
-                            "نزّل موديل Gemma 3 1B بصيغة .task (حوالي 550 ميجا) من صفحة Gemma على Kaggle أو Hugging Face، " +
-                                "وبعدين اختاره من هنا. بيشتغل جوه الموبايل من غير نت ومن غير مفتاح. " +
-                                "الموديلات الصغيرة أضعف من Claude في التحكم في الشاشة.",
+                            "نزّل موديل بصيغة .task من صفحة LiteRT على Hugging Face (مثلاً Gemma 3 1B أو Qwen 2.5 1.5B — من 0.5 لـ 1.5 جيجا)، " +
+                                "واختاره أو حط لينكه. بيشتغل جوه الموبايل من غير نت ومن غير مفتاح ومن غير فلوس. " +
+                                "بيفهم كلامك العادي (رسايل، مكالمات، أسئلة) كويس، وأضعف من Claude في المهام الطويلة على الشاشة.",
                             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp),
                         )
                     } else {
                     NeoTextField(aiModel, { aiModel = it }, "اسم الموديل")
                     if (settings.aiProvider == ProviderKind.OPENAI_COMPATIBLE.id) {
                         Spacer(Modifier.height(8.dp))
+                        Text("موديلات مجانية جاهزة:", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Triple("OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-oss-120b:free"),
+                                Triple("NVIDIA", "https://integrate.api.nvidia.com/v1", "meta/llama-3.3-70b-instruct"),
+                                Triple("Groq", "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+                            ).forEach { (label, url, model) ->
+                                FilterChip(aiBase == url, { aiBase = url; aiModel = model }, { Text(label) }, colors = chipColors())
+                            }
+                        }
                         NeoTextField(aiBase, { aiBase = it }, "Base URL (مثلاً http://127.0.0.1:8080/v1)")
                         Text(
                             "موديل محلي على الموبايل: شغّل llama.cpp server أو Ollama في Termux وحط عنوانه هنا (بيشتغل من غير نت). " +
@@ -342,6 +374,9 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+
+                SectionTitle("التحكم عن بعد")
+                TelegramSection(settings)
 
                 SectionTitle("البيانات")
                 NavCard(Icons.Filled.FileUpload, "تصدير الأوامر", "ملف JSON فيه كل الأوامر والأسماء") { exporter.launch("nabra-commands.json") }

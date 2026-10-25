@@ -10,6 +10,8 @@ sealed interface Resolution {
     data class NeedsArg(val action: SysAction) : Resolution
     data class OpenApp(val app: AppEntry, val score: Double) : Resolution
     data class OpenAppUnknown(val name: String) : Resolution
+    /** A natural request understood offline (message, call, alarm, search…). */
+    data class Skill(val intent: com.daniel.assistant.skills.SkillIntent, val text: String) : Resolution
     data class Ai(val text: String) : Resolution
     data class Cancel(val text: String) : Resolution
     data class Unknown(val text: String) : Resolution
@@ -41,6 +43,7 @@ class CommandResolver(
         matchCustom(text, commands, heard)?.let { return it }
         matchSystem(text)?.let { return it }
         matchOpenApp(text, apps)?.let { return it }
+        com.daniel.assistant.skills.IntentParser.parse(heard)?.let { return Resolution.Skill(it, heard) }
 
         return if (aiAvailable) Resolution.Ai(heard) else Resolution.Unknown(heard)
     }
@@ -98,6 +101,7 @@ class CommandResolver(
             .maxByOrNull { (it.second as Resolution.Custom).score }
             ?.let { return it }
         resolved.firstOrNull { it.second is Resolution.Cancel }?.let { return it }
+        resolved.firstOrNull { it.second is Resolution.Skill }?.let { return it }
         resolved.filter { it.second is Resolution.OpenApp }
             .maxByOrNull { (it.second as Resolution.OpenApp).score }
             ?.let { return it }

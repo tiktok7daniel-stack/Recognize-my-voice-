@@ -31,6 +31,11 @@ object Permissions {
         return pm.isIgnoringBatteryOptimizations(context.packageName)
     }
     fun overlay(context: Context) = Settings.canDrawOverlays(context)
+    fun contacts(context: Context) = has(context, Manifest.permission.READ_CONTACTS)
+    fun calls(context: Context) = has(context, Manifest.permission.CALL_PHONE)
+    fun writeSettings(context: Context) = Settings.System.canWrite(context)
+    fun writeSettingsIntent(context: Context) =
+        Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}"))
 
     fun allEssential(context: Context) = mic(context) && accessibility(context)
 

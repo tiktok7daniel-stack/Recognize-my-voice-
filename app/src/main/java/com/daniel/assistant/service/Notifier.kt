@@ -118,6 +118,22 @@ class Notifier(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_HIGH),
     )
 
+    /** After a successful AI task: offer to save it as a normal (instant, offline) command. */
+    fun offerSaveRecipe(command: String, steps: Int) {
+        val pi = PendingIntent.getBroadcast(
+            context, 31,
+            Intent(context, com.daniel.assistant.ai.SaveRecipeReceiver::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        post(
+            ID_INFO,
+            base(CH_ALERTS).setContentTitle("خلصت ✅ — أحفظها كأمر؟")
+                .setContentText("\"$command\" ($steps خطوات) — المرة الجاية تتنفذ لحظيًا ومن غير نت")
+                .addAction(0, "احفظ كأمر", pi)
+                .setAutoCancel(true),
+        )
+    }
+
     fun bootPrompt() = post(
         ID_BOOT,
         base(CH_ALERTS).setContentTitle("Nabra")

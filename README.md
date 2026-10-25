@@ -83,6 +83,28 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
   **floating mic bubble** over all apps, a **Quick Settings tile**, and a long-press
   **app-icon shortcut**.
 
+## Talk normally (natural requests)
+
+* An **offline Egyptian intent parser** runs instantly and needs no AI. It understands:
+  * messages: "كلم محمد على الماسنجر وقوله…", "ابعت لأحمد على الواتس…", "قول لماما إن…"
+  * calls, alarms and timers: "اتصل بـ…", "صحيني الساعة ٧ ونص", "تايمر ٥ دقايق"
+  * search and navigation: "دور على … في يوتيوب", "وديني …"
+  * volume, brightness and real Wi-Fi/Bluetooth toggles: "خلي الصوت ٥٠", "شغل الواي فاي"
+* **Skills**: WhatsApp messages open a deep link to the contact's chat (resolved from your contacts)
+  and then press send. Messenger, Telegram and Instagram are driven through the UI: search, open
+  the chat, type, send. SMS, calls (contacts lookup), AlarmClock alarms/timers, search, maps
+  navigation, volume and brightness are also covered. Wi-Fi/Bluetooth are switched for real
+  through the system panel and accessibility.
+* **AI understanding**: any other sentence goes to the AI, which runs **on the phone, offline**
+  (MediaPipe LLM, `.task` model imported or downloaded by link), or to an online model. The AI
+  returns one intent: a skill, a spoken chat answer, or a multi-step screen task.
+* **Skill memory**: after the AI agent completes a task, Nabra offers to save the steps as a
+  normal command, so next time it runs instantly and offline.
+* **Recovery**: *Click on text* scrolls and retries when the target isn't visible.
+* **Telegram remote**: use your own bot with a one-time pairing code. Messages run as commands,
+  and `/stop` cancels.
+* **Free online model presets**: OpenRouter, NVIDIA and Groq.
+
 ## Advanced features
 
 * **Variables in triggers**: `ابعت لـ {اسم} {رسالة}` matches "ابعت لأحمد أنا جاي". Steps can use

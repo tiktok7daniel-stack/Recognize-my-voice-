@@ -488,6 +488,27 @@ private fun buildPages(): List<TutorialPage> = listOf(
         },
     ),
     TutorialPage(
+        tag = "اتكلم عادي",
+        title = "قوله اللي عايزه بكلامك",
+        lines = listOf(
+            "رسايل: \"كلّم محمد على الماسنجر وقوله أنا مش هقدر آجي النهارده\" أو \"ابعت لأحمد على الواتس أنا جاي\".",
+            "مكالمات ومنبهات: \"اتصل بماما\"، \"صحّيني الساعة ٧ ونص\"، \"تايمر ٥ دقايق\".",
+            "بحث وخرايط: \"دوّر على أغاني عمرو دياب في يوتيوب\"، \"ودّيني مدينة نصر\".",
+            "الجهاز: \"شغّل الواي فاي\"، \"اقفل البلوتوث\"، \"خلي الصوت ٥٠\"، \"خلي الإضاءة ٣٠\".",
+            "أي حاجة تانية أو سؤال: الذكاء الاصطناعي اللي جوه الموبايل بيفهمها ويرد عليك أو ينفّذها.",
+        ),
+        tip = "الجمل المعروفة بتتنفذ فورًا ومن غير نت. لما الذكاء الاصطناعي يخلّص مهمة جديدة، هيسألك \"أحفظها كأمر؟\" عشان المرة الجاية تبقى لحظية.",
+        illustration = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Bubble("كلّم محمد على الماسنجر وقوله…", true)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconBubble(Icons.AutoMirrored.Filled.Send, Neo.Cyan, 52)
+                    IconBubble(Icons.Filled.AutoAwesome, Neo.Accent, 52)
+                }
+            }
+        },
+    ),
+    TutorialPage(
         tag = "مميزات متقدمة",
         title = "خلّي أوامرك أذكى",
         lines = listOf(

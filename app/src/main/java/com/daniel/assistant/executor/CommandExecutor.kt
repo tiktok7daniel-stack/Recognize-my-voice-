@@ -117,6 +117,36 @@ class CommandExecutor(
         }
     }
 
+    // ---------- building blocks used by skills ----------
+
+    suspend fun <T> waitForNode(timeoutMs: Long = stepTimeoutMs, block: (AssistantAccessibilityService) -> T?): T? =
+        waitFor(timeoutMs, block)
+
+    suspend fun typeTextNow(text: String): String? = typeText(text)
+    suspend fun pressSendNow(): String? = pressSend()
+    fun accessibility(): AssistantAccessibilityService? = service()
+
+    /** Runs a multi-step task (e.g. a skill) with the progress panel, cancellation and logging. */
+    fun runTask(name: String, total: Int, block: suspend (step: (Int, String) -> Unit) -> String?): Job {
+        cancel()
+        return scope.launch {
+            _running.value = name
+            log.info("تشغيل: $name")
+            try {
+                val err = block { i, d -> _progress.value = Progress(name, i, total, d) }
+                if (err != null) {
+                    feedback.errorCue()
+                    feedback.say(err)
+                    notifier.stepFailed(name, 0, name, err)
+                    log.error("$name: $err")
+                } else log.ok("$name ✅")
+            } finally {
+                _running.value = null
+                _progress.value = null
+            }
+        }.also { job = it }
+    }
+
     // ---------- system commands ----------
 
     suspend fun runSystem(action: SysAction, arg: String?): String? {
@@ -224,7 +254,17 @@ class CommandExecutor(
     }
 
     private suspend fun clickText(text: String): String? {
-        val node = waitFor { NodeActions.findNodeByText(it.root(), text) } ?: return "مش لاقي \"$text\" على الشاشة"
+        var node = waitFor { NodeActions.findNodeByText(it.root(), text) }
+        // Recovery: the target may be further down the list — scroll and look again.
+        var tries = 0
+        while (node == null && tries < 2) {
+            val sv = service() ?: return NO_ACCESSIBILITY
+            NodeActions.scroll(sv, down = true)
+            delay(450)
+            node = waitFor(1_500) { NodeActions.findNodeByText(it.root(), text) }
+            tries++
+        }
+        if (node == null) return "مش لاقي \"$text\" على الشاشة"
         val s = service() ?: return NO_ACCESSIBILITY
         return if (NodeActions.clickNode(s, node)) null else "مقدرتش أضغط على \"$text\""
     }

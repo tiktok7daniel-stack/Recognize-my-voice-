@@ -73,6 +73,25 @@ class AiAgent(
         return local || isOnline()
     }
 
+    /** One AI call: turns a free sentence into an intent (message, call, chat answer, task…). */
+    suspend fun understand(command: String): com.daniel.assistant.skills.SkillIntent? {
+        if (!isAvailable()) return null
+        val provider = buildProvider() ?: return null
+        return try {
+            com.daniel.assistant.skills.AiIntent.parse(provider.complete(com.daniel.assistant.skills.AiIntent.PROMPT, command))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            log.error("AI (فهم): ${e.message}")
+            null
+        }
+    }
+
+    /** Steps of the last successful AI run, offered to the user as a reusable command. */
+    data class Recipe(val command: String, val steps: List<com.daniel.assistant.commands.Step>)
+    @Volatile var lastRecipe: Recipe? = null
+        private set
+
     fun cancel() {
         job?.cancel()
         job = null
@@ -118,6 +137,8 @@ class AiAgent(
             }
             feedback.say("ماشي")
             val history = mutableListOf<String>()
+            val recipe = mutableListOf<com.daniel.assistant.commands.Step>()
+            var recipeComplete = true
             val confirmSensitive = settings.current().aiConfirmSensitive
             for (stepNo in 1..MAX_STEPS) {
                 _step.value = stepNo
@@ -148,6 +169,10 @@ class AiAgent(
                 if (action is AiAction.Done) {
                     feedback.say(action.say.ifBlank { "خلصت" })
                     log.ok("AI خلص في $stepNo خطوة: ${action.say}")
+                    if (recipeComplete && recipe.isNotEmpty()) {
+                        lastRecipe = Recipe(command, recipe.toList())
+                        notifier.offerSaveRecipe(command, recipe.size)
+                    }
                     return
                 }
                 val label = (action as? AiAction.Click)?.let { a ->
@@ -167,6 +192,21 @@ class AiAgent(
                 }
                 _status.value = describe(action, label)
                 val err = execute(service, action, snap)
+                if (err == null) {
+                    // Learn: record the action as a replayable step (skill memory).
+                    when (action) {
+                        is AiAction.Click -> label?.trim()?.takeIf { it.isNotBlank() }
+                            ?.let { recipe.add(com.daniel.assistant.commands.Step.ClickText(it.take(40))) } ?: run { recipeComplete = false }
+                        is AiAction.Type -> recipe.add(com.daniel.assistant.commands.Step.TypeText(action.text))
+                        is AiAction.OpenApp -> CommandResolver().findApp(action.name, appsProvider())?.app
+                            ?.let { recipe.add(com.daniel.assistant.commands.Step.OpenApp(it.packageName, it.label)) }
+                        is AiAction.Scroll -> recipe.add(com.daniel.assistant.commands.Step.Scroll(action.down))
+                        is AiAction.Back -> recipe.add(com.daniel.assistant.commands.Step.Back)
+                        is AiAction.Home -> recipe.add(com.daniel.assistant.commands.Step.Home)
+                        is AiAction.Wait -> recipe.add(com.daniel.assistant.commands.Step.Wait(action.millis))
+                        is AiAction.Done -> Unit
+                    }
+                }
                 history.add(describe(action, label) + if (err != null) " -> FAILED: $err" else " -> ok")
                 settle()
             }

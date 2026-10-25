@@ -137,6 +137,16 @@ object NodeActions {
         return node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
     }
 
+    /** Horizontal swipe across the middle of the screen (stories, pages, tabs). */
+    fun swipeHorizontal(service: AccessibilityService, toLeft: Boolean): Boolean {
+        val dm = service.resources.displayMetrics
+        val y = dm.heightPixels * 0.5f
+        val (x1, x2) = if (toLeft) dm.widthPixels * 0.85f to dm.widthPixels * 0.15f else dm.widthPixels * 0.15f to dm.widthPixels * 0.85f
+        val path = Path().apply { moveTo(x1, y); lineTo(x2, y) }
+        val g = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 250)).build()
+        return service.dispatchGesture(g, null, null)
+    }
+
     /** Scrolls the largest scrollable container; falls back to a swipe. */
     fun scroll(service: AccessibilityService, down: Boolean): Boolean {
         val root = runCatching { service.rootInActiveWindow }.getOrNull()

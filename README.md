@@ -89,6 +89,11 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
   `{اسم}` / `{رسالة}` in *Type text*, *Click on text*, the photo text, or system-command arguments.
 * **Automations**: a command can run by itself every day at a time (AlarmManager), or when a
   chosen app comes to the foreground (via the accessibility service, at most once per minute).
+* **Hardware buttons**: double, triple, or long press on volume up/down can run any command
+  or start listening. This uses the accessibility key filter; single presses still change
+  the volume.
+* **More system actions**: media play/pause/next/previous, power menu, split screen,
+  swipe left/right, and an *Open link* step.
 * **Execution panel**: while a command or the AI runs, a small overlay at the top shows the
   current step and a **Stop** button.
 * **Voice lock**: the Vosk speaker model (`vosk-model-spk-0.4`, 13 MB) creates a voice print.

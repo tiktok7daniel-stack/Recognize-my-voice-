@@ -27,6 +27,13 @@ enum class SysAction(
     TORCH_OFF("torch_off", "اطفي الكشاف", listOf("اطفي الكشاف", "طفي الكشاف", "اقفل الكشاف", "اطفي الفلاش"), needsAccessibility = false),
     WIFI("wifi", "واي فاي", listOf("واي فاي", "الواي فاي", "وايفاي", "النت"), needsAccessibility = false),
     BLUETOOTH("bluetooth", "بلوتوث", listOf("بلوتوث", "البلوتوث"), needsAccessibility = false),
+    PLAY_PAUSE("play_pause", "شغّل / وقّف الأغنية", listOf("شغل الاغنية", "وقف الاغنية", "كمل الاغنية", "بلاي", "بوز"), needsAccessibility = false),
+    NEXT_TRACK("next_track", "الأغنية اللي بعدها", listOf("اللي بعدها", "الاغنية اللي بعدها", "التالي"), needsAccessibility = false),
+    PREV_TRACK("prev_track", "الأغنية اللي قبلها", listOf("اللي قبلها", "الاغنية اللي قبلها", "السابق"), needsAccessibility = false),
+    POWER_MENU("power_menu", "قايمة الباور", listOf("قايمة الباور", "زرار الباور", "اطفي التليفون")),
+    SPLIT_SCREEN("split_screen", "تقسيم الشاشة", listOf("قسم الشاشة", "تقسيم الشاشة")),
+    SWIPE_LEFT("swipe_left", "اسحب شمال", listOf("اسحب شمال", "شمال")),
+    SWIPE_RIGHT("swipe_right", "اسحب يمين", listOf("اسحب يمين", "يمين")),
     CLICK("click", "اضغط على", listOf("اضغط على", "دوس على", "اضغط"), takesArg = true),
     TYPE("type", "اكتب", listOf("اكتب", "اكتبلي"), takesArg = true);
 

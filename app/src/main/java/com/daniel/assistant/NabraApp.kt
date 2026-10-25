@@ -10,6 +10,8 @@ import com.daniel.assistant.data.ExecLog
 import com.daniel.assistant.data.SettingsRepo
 import com.daniel.assistant.data.db.AppDatabase
 import com.daniel.assistant.accessibility.AssistantAccessibilityService
+import com.daniel.assistant.accessibility.ButtonGesture
+import com.daniel.assistant.accessibility.ButtonGestures
 import com.daniel.assistant.executor.Automations
 import com.daniel.assistant.executor.CommandExecutor
 import com.daniel.assistant.service.AssistantBrain
@@ -65,6 +67,19 @@ class AppContainer(val app: Application) {
         appIndex.entries(aliases.groupBy({ it.packageName }, { it.alias }))
     }
 
+    /** Listen for a command now — via the service, or through the activity if a background start is blocked. */
+    fun startListenNow() {
+        try {
+            com.daniel.assistant.service.ListeningService.listenNow(app)
+        } catch (e: Exception) {
+            com.daniel.assistant.executor.AppLauncher.start(
+                app,
+                android.content.Intent(app, com.daniel.assistant.ui.MainActivity::class.java)
+                    .setAction(com.daniel.assistant.service.ListeningService.ACTION_LISTEN_NOW),
+            )
+        }
+    }
+
     suspend fun appEntries(): List<AppEntry> {
         appIndex.ensureLoaded()
         val aliases = repo.allAliases().groupBy({ it.packageName }, { it.alias })
@@ -95,6 +110,26 @@ class AppContainer(val app: Application) {
         }
         scope.launch {
             repo.commands.collect { automations.schedule(it) }
+        }
+        // Physical buttons: keep the detector's active gestures in sync and react to them.
+        scope.launch {
+            combine(repo.commands, settings.flow) { cmds, s ->
+                (cmds.filter { it.enabled }.mapNotNull { ButtonGesture.byId(it.autoButton) } +
+                    listOfNotNull(ButtonGesture.byId(s.listenButton))).toSet()
+            }.collect { ButtonGestures.active = it }
+        }
+        scope.launch {
+            ButtonGestures.events.collect { g ->
+                feedback.cue()
+                if (settings.current().listenButton == g.id) {
+                    startListenNow()
+                    return@collect
+                }
+                repo.all().firstOrNull { it.enabled && it.autoButton == g.id }?.let { cmd ->
+                    log.info("زرار (${g.title}) ← \"${cmd.name}\"")
+                    executor.run(cmd)
+                }
+            }
         }
         scope.launch {
             AssistantAccessibilityService.appOpened.collect { pkg ->

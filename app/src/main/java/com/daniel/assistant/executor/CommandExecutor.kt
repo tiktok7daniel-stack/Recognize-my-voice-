@@ -111,6 +111,10 @@ class CommandExecutor(
         is Step.Scroll -> service()?.let { if (NodeActions.scroll(it, step.down)) null else "مفيش حاجة تتعمل لها سكرول" }
             ?: NO_ACCESSIBILITY
         is Step.System -> SysAction.byId(step.actionId)?.let { runSystem(it, step.arg) } ?: "أمر غير معروف"
+        is Step.OpenUrl -> {
+            val url = step.url.trim().let { if (it.contains("://")) it else "https://$it" }
+            if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))) null else "مقدرتش أفتح اللينك"
+        }
     }
 
     // ---------- system commands ----------
@@ -138,6 +142,13 @@ class CommandExecutor(
             SysAction.BLUETOOTH -> {
                 if (AppLauncher.start(context, Intent(Settings.ACTION_BLUETOOTH_SETTINGS))) null else "مقدرتش أفتح البلوتوث"
             }
+            SysAction.PLAY_PAUSE -> media(android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            SysAction.NEXT_TRACK -> media(android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+            SysAction.PREV_TRACK -> media(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            SysAction.POWER_MENU -> global(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG)
+            SysAction.SPLIT_SCREEN -> global(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+            SysAction.SWIPE_LEFT -> service()?.let { if (NodeActions.swipeHorizontal(it, toLeft = true)) null else "مقدرتش أسحب" } ?: NO_ACCESSIBILITY
+            SysAction.SWIPE_RIGHT -> service()?.let { if (NodeActions.swipeHorizontal(it, toLeft = false)) null else "مقدرتش أسحب" } ?: NO_ACCESSIBILITY
             SysAction.CLICK -> if (arg.isNullOrBlank()) "مفيش نص أضغط عليه" else clickText(arg)
             SysAction.TYPE -> if (arg.isNullOrBlank()) "مفيش نص أكتبه" else typeText(arg)
         }
@@ -214,6 +225,13 @@ class CommandExecutor(
         val node = waitFor { NodeActions.findNodeByText(it.root(), text) } ?: return "مش لاقي \"$text\" على الشاشة"
         val s = service() ?: return NO_ACCESSIBILITY
         return if (NodeActions.clickNode(s, node)) null else "مقدرتش أضغط على \"$text\""
+    }
+
+    private fun media(keyCode: Int): String? {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keyCode))
+        am.dispatchMediaKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode))
+        return null
     }
 
     private fun volume(direction: Int): String? {

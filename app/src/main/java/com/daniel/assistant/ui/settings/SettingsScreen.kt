@@ -97,6 +97,7 @@ fun SettingsScreen(
     fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
     var localCopy by remember { mutableStateOf<String?>(null) }
+    var pickListenButton by remember { mutableStateOf(false) }
     val llmPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             localCopy = "بنسخ الموديل… (ممكن ياخد دقيقة)"
@@ -137,7 +138,7 @@ fun SettingsScreen(
             }
             result.onSuccess { bundle ->
                 bundle.commands.forEach { e ->
-                    c.repo.save(CustomCommand(name = e.name, enabled = e.enabled, triggers = e.triggers, steps = e.steps, autoTime = e.autoTime, autoApp = e.autoApp))
+                    c.repo.save(CustomCommand(name = e.name, enabled = e.enabled, triggers = e.triggers, steps = e.steps, autoTime = e.autoTime, autoApp = e.autoApp, autoButton = e.autoButton))
                 }
                 val existing = c.repo.allAliases().map { it.packageName to it.alias }.toSet()
                 bundle.aliases.filter { (it.packageName to it.alias) !in existing }
@@ -195,6 +196,16 @@ fun SettingsScreen(
                             }
                         }
                         scope.launch { c.settings.setFloatingBubble(v) }
+                    }
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("زرار للاستماع", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                com.daniel.assistant.accessibility.ButtonGesture.byId(settings.listenButton)?.title ?: "مش متحدد — مثلاً ضغطة طويلة على وطّي الصوت",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        androidx.compose.material3.TextButton(onClick = { pickListenButton = true }) { Text("اختار", color = Neo.Cyan) }
                     }
                     Text(
                         "طرق تانية سريعة: اسحب الإشعارات وضيف مربع \"Nabra\" للإعدادات السريعة، أو اضغط مطولًا على أيقونة التطبيق ← \"قول أمر\".",
@@ -337,6 +348,12 @@ fun SettingsScreen(
         }
     }
 
+    if (pickListenButton) {
+        com.daniel.assistant.ui.components.GesturePickerDialog(onDismiss = { pickListenButton = false }) { g ->
+            scope.launch { c.settings.setListenButton(g?.id ?: "") }
+            pickListenButton = false
+        }
+    }
     if (recordWake) {
         TriggerRecorderDialog(title = "قول كلمة التنبيه", maxTakes = 1, onDismiss = { recordWake = false }) { v ->
             wake = v.first()

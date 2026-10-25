@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapVert
@@ -65,6 +66,7 @@ fun StepType.icon(): ImageVector = when (this) {
     StepType.BACK -> Icons.AutoMirrored.Filled.ArrowBack
     StepType.HOME -> Icons.Filled.Home
     StepType.SCROLL -> Icons.Filled.SwapVert
+    StepType.OPEN_URL -> Icons.Filled.Language
     StepType.SYSTEM -> Icons.Filled.Settings
 }
 
@@ -114,6 +116,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
             is Step.ClickText -> initial.text
             is Step.System -> initial.arg ?: ""
             is Step.AttachPhotos -> initial.text ?: ""
+            is Step.OpenUrl -> initial.url
             else -> ""
         }
     ) }
@@ -136,6 +139,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
         StepType.TYPE_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.TypeText(it) }
         StepType.CLICK_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.ClickText(it.trim()) }
         StepType.WAIT -> Step.Wait(millis.roundToInt().toLong())
+        StepType.OPEN_URL -> text.takeIf { it.isNotBlank() }?.let { Step.OpenUrl(it.trim()) }
         StepType.SCROLL -> Step.Scroll(down)
         StepType.SYSTEM -> if (sys.takesArg && text.isBlank()) null else Step.System(sys.id, text.takeIf { sys.takesArg })
         else -> null
@@ -172,6 +176,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                         Text("تقدر تكتب متغير زي {رسالة} لو كلمة التشغيل فيها متغيرات.", style = MaterialTheme.typography.bodySmall)
                     }
                     StepType.CLICK_TEXT -> NeoTextField(text, { text = it }, "النص أو الوصف اللي على الزرار")
+                    StepType.OPEN_URL -> NeoTextField(text, { text = it }, "اللينك (مثلاً youtube.com أو tel:0100…)")
                     StepType.WAIT -> {
                         Text("${millis.roundToInt()} ms")
                         Slider(

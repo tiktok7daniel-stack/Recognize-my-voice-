@@ -39,6 +39,10 @@ class AssistantAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    /** Volume-key gestures (double / triple / long press) → commands. */
+    override fun onKeyEvent(event: android.view.KeyEvent): Boolean =
+        ButtonGestures.onKeyEvent(event) || super.onKeyEvent(event)
+
     override fun onUnbind(intent: Intent?): Boolean {
         _instance.value = null
         return super.onUnbind(intent)

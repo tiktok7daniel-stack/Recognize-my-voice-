@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Schedule
@@ -89,6 +90,8 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
     var autoApp by remember { mutableStateOf<String?>(null) }
     var autoAppLabel by remember { mutableStateOf<String?>(null) }
     var pickAutoApp by remember { mutableStateOf(false) }
+    var autoButton by remember { mutableStateOf<String?>(null) }
+    var pickButton by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var showRecorder by remember { mutableStateOf(false) }
@@ -104,6 +107,7 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                 enabled = cmd.enabled
                 autoTime = cmd.autoTime
                 autoApp = cmd.autoApp
+                autoButton = cmd.autoButton
                 autoAppLabel = cmd.autoApp?.let { c.appIndex.labelOf(it) ?: it }
                 triggers.clear(); triggers.addAll(cmd.triggers)
                 steps.clear(); cmd.steps.forEach { steps.add(UiStep(nextKey++, it)) }
@@ -137,6 +141,7 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                     steps = steps.map { it.step },
                     autoTime = autoTime,
                     autoApp = autoApp,
+                    autoButton = autoButton,
                 )
             )
             onBack()
@@ -285,8 +290,20 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
                             }
                             TextButton(onClick = { pickAutoApp = true }) { Text(if (autoApp == null) "اختار" else "تغيير", color = Neo.Cyan) }
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconBubble(Icons.AutoMirrored.Filled.VolumeUp, size = 36)
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                com.daniel.assistant.accessibility.ButtonGesture.byId(autoButton)?.title ?: "بزرار الصوت (دوستين / ضغطة طويلة)",
+                                style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f),
+                            )
+                            if (autoButton != null) {
+                                IconButton(onClick = { autoButton = null }) { Icon(Icons.Filled.Close, "إلغاء", tint = Neo.TextDim) }
+                            }
+                            TextButton(onClick = { pickButton = true }) { Text(if (autoButton == null) "اختار" else "تغيير", color = Neo.Cyan) }
+                        }
                         Text(
-                            "التشغيل عند فتح تطبيق محتاج خدمة إمكانية الوصول، ومش بيتكرر أكتر من مرة في الدقيقة.",
+                            "التشغيل عند فتح تطبيق أو بالزرار محتاج خدمة إمكانية الوصول. فتح التطبيق مش بيكرر الأمر أكتر من مرة في الدقيقة.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -334,6 +351,12 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { showManual = false }) { Text("إلغاء", color = Neo.TextDim) } },
         )
+    }
+    if (pickButton) {
+        com.daniel.assistant.ui.components.GesturePickerDialog(onDismiss = { pickButton = false }) { g ->
+            autoButton = g?.id
+            pickButton = false
+        }
     }
     if (pickAutoApp) {
         com.daniel.assistant.ui.apps.AppPickerDialog(onDismiss = { pickAutoApp = false }) { app ->

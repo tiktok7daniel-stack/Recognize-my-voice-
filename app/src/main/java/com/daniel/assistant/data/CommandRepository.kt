@@ -34,6 +34,7 @@ class CommandRepository(private val dao: CommandDao, private val aliasDao: Alias
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             autoTime = c.autoTime,
             autoApp = c.autoApp,
+            autoButton = c.autoButton,
         )
         val id = dao.upsert(entity)
         return if (c.id != 0L) c.id else id
@@ -56,6 +57,7 @@ class CommandRepository(private val dao: CommandDao, private val aliasDao: Alias
             steps = CommandJson.json.decodeFromString(stepsSer, e.stepsJson),
             autoTime = e.autoTime,
             autoApp = e.autoApp,
+            autoButton = e.autoButton,
         )
     }.getOrNull()
 }

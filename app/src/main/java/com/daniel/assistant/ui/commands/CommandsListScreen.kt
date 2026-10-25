@@ -121,7 +121,8 @@ private fun CommandCard(
                 Text(
                     "${cmd.steps.size} خطوات" +
                         (cmd.autoTime?.let { " • ⏰ $it" } ?: "") +
-                        (if (cmd.autoApp != null) " • 📱 تلقائي" else ""),
+                        (if (cmd.autoApp != null) " • 📱 تلقائي" else "") +
+                        (if (cmd.autoButton != null) " • 🔘 زرار" else ""),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

@@ -40,6 +40,9 @@ sealed class Step {
     @Serializable @SerialName("scroll")
     data class Scroll(val down: Boolean = true) : Step()
 
+    @Serializable @SerialName("open_url")
+    data class OpenUrl(val url: String) : Step()
+
     @Serializable @SerialName("system")
     data class System(val actionId: String, val arg: String? = null) : Step()
 
@@ -54,6 +57,7 @@ sealed class Step {
         Back -> "رجوع"
         Home -> "الرئيسية"
         is Scroll -> if (down) "انزل" else "اطلع"
+        is OpenUrl -> "افتح $url"
         is System -> SysAction.byId(actionId)?.title?.let { t -> if (arg.isNullOrBlank()) t else "$t: $arg" } ?: actionId
     }
 
@@ -76,6 +80,7 @@ enum class StepType(val title: String) {
     BACK("رجوع"),
     HOME("الرئيسية"),
     SCROLL("سكرول"),
+    OPEN_URL("افتح لينك / موقع"),
     SYSTEM("أمر نظام"),
 }
 
@@ -89,6 +94,7 @@ fun Step.type(): StepType = when (this) {
     Step.Back -> StepType.BACK
     Step.Home -> StepType.HOME
     is Step.Scroll -> StepType.SCROLL
+    is Step.OpenUrl -> StepType.OPEN_URL
     is Step.System -> StepType.SYSTEM
 }
 
@@ -103,6 +109,8 @@ data class CustomCommand(
     val autoTime: String? = null,
     /** Run automatically when this app (package) comes to the foreground, or null. */
     val autoApp: String? = null,
+    /** Run when this physical-button gesture happens (ButtonGesture id), or null. */
+    val autoButton: String? = null,
 )
 
 object CommandJson {

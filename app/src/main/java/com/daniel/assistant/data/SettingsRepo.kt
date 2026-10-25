@@ -43,6 +43,8 @@ data class AppSettings(
     val directTriggers: Boolean = true,
     val floatingBubble: Boolean = false,
     val voiceLock: Boolean = false,
+    /** Button gesture that starts listening for a command (ButtonGesture id), or "". */
+    val listenButton: String = "",
     val voicePrint: String = "",
     val voiceLockThreshold: Float = 0.55f,
     val aiEnabled: Boolean = false,
@@ -73,6 +75,7 @@ class SettingsRepo(private val context: Context) {
         val direct = booleanPreferencesKey("direct_triggers")
         val bubble = booleanPreferencesKey("floating_bubble")
         val voiceLock = booleanPreferencesKey("voice_lock")
+        val listenButton = stringPreferencesKey("listen_button")
         val voicePrint = stringPreferencesKey("voice_print")
         val voiceLockThreshold = floatPreferencesKey("voice_lock_threshold")
         val aiEnabled = booleanPreferencesKey("ai_enabled")
@@ -103,6 +106,7 @@ class SettingsRepo(private val context: Context) {
             directTriggers = p[K.direct] ?: d.directTriggers,
             floatingBubble = p[K.bubble] ?: d.floatingBubble,
             voiceLock = p[K.voiceLock] ?: d.voiceLock,
+            listenButton = p[K.listenButton] ?: d.listenButton,
             voicePrint = p[K.voicePrint] ?: d.voicePrint,
             voiceLockThreshold = p[K.voiceLockThreshold] ?: d.voiceLockThreshold,
             aiEnabled = p[K.aiEnabled] ?: d.aiEnabled,
@@ -137,6 +141,7 @@ class SettingsRepo(private val context: Context) {
     suspend fun setDirectTriggers(v: Boolean) = edit { it[K.direct] = v }
     suspend fun setFloatingBubble(v: Boolean) = edit { it[K.bubble] = v }
     suspend fun setVoiceLock(v: Boolean) = edit { it[K.voiceLock] = v }
+    suspend fun setListenButton(v: String) = edit { it[K.listenButton] = v }
     suspend fun setVoicePrint(v: String) = edit { it[K.voicePrint] = v }
     suspend fun setVoiceLockThreshold(v: Float) = edit { it[K.voiceLockThreshold] = v }
     suspend fun setAiEnabled(v: Boolean) = edit { it[K.aiEnabled] = v }

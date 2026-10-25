@@ -16,6 +16,7 @@ data class CommandEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val autoTime: String? = null,
     val autoApp: String? = null,
+    val autoButton: String? = null,
 )
 
 @Entity(tableName = "aliases", indices = [Index("packageName")])

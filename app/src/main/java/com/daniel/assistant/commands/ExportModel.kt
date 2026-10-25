@@ -19,6 +19,7 @@ data class ExportCommand(
     val steps: List<Step>,
     val autoTime: String? = null,
     val autoApp: String? = null,
+    val autoButton: String? = null,
 )
 
 @Serializable
@@ -29,7 +30,7 @@ object ImportExport {
         CommandJson.pretty.encodeToString(
             ExportBundle.serializer(),
             ExportBundle(
-                commands = commands.map { ExportCommand(it.name, it.enabled, it.triggers, it.steps, it.autoTime, it.autoApp) },
+                commands = commands.map { ExportCommand(it.name, it.enabled, it.triggers, it.steps, it.autoTime, it.autoApp, it.autoButton) },
                 aliases = aliases,
             ),
         )

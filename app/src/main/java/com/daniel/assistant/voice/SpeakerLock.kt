@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.vosk.SpkModel
+import org.vosk.SpeakerModel
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -23,7 +23,7 @@ import kotlin.math.sqrt
 class SpeakerLock(private val context: Context) {
 
     private val dir = File(context.filesDir, "spk")
-    private var model: SpkModel? = null
+    private var model: SpeakerModel? = null
 
     private val _status = MutableStateFlow<String?>(null)
     val status: StateFlow<String?> = _status.asStateFlow()
@@ -68,8 +68,8 @@ class SpeakerLock(private val context: Context) {
         }
     }
 
-    suspend fun load(): SpkModel? = withContext(Dispatchers.IO) {
-        model ?: runCatching { if (isDownloaded()) SpkModel(dir.absolutePath) else null }.getOrNull()?.also { model = it }
+    suspend fun load(): SpeakerModel? = withContext(Dispatchers.IO) {
+        model ?: runCatching { if (isDownloaded()) SpeakerModel(dir.absolutePath) else null }.getOrNull()?.also { model = it }
     }
 
     /** Compares [vector] with the enrolled [print]; records the similarity. */

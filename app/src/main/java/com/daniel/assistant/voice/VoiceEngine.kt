@@ -46,7 +46,7 @@ class VoiceEngine(private val models: ModelManager) {
     val listening: StateFlow<Boolean> = _listening.asStateFlow()
 
     /** Speaker (voice-print) model; when set, results carry a voice vector. */
-    @Volatile var speakerModel: org.vosk.SpkModel? = null
+    @Volatile var speakerModel: org.vosk.SpeakerModel? = null
 
     /** Voice-print vector of the most recent final result (null if unavailable). */
     @Volatile var lastSpeakerVector: FloatArray? = null

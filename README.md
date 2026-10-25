@@ -109,13 +109,17 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
 
 * The wake word triggers from **partial** Vosk results, while you are still saying it,
   instead of waiting for end-of-utterance silence.
+* **Instant triggers**: a direct trigger such as "واحد" fires as soon as the partial result
+  equals it. An optional 0/150/350 ms stability delay is available, and the final result is
+  then ignored.
 * **Early accept**: if a partial Google result is already an exact trigger or system
   command, listening stops and the command runs right away.
 * The Google recognizer instance is **kept warm**, the end-of-speech silence is shorter
   (700 ms), and commands, apps and bias phrases are cached in memory.
 * **Matching**: digits are mapped to Egyptian number words ("1" → "واحد"), pronunciation
   is folded (ث→ت, ذ→د, ظ→ض), and the highest-scoring of the 5 alternatives wins.
-* UI steps poll every 80 ms. The demo wait is 0.8 s.
+* UI steps poll every 80 ms. *Press send* waits until the button is enabled (photos uploaded),
+  so the demo's fixed wait is only 0.3 s.
 * **⏱ readout**: Home and the Log show the response time, from end of speech to action.
 
 ## How it works

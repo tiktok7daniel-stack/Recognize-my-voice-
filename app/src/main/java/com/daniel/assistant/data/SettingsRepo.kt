@@ -38,6 +38,11 @@ data class AppSettings(
     val demoSeeded: Boolean = false,
     val demoTextV2: Boolean = false,
     val demoV3: Boolean = false,
+    val demoV4: Boolean = false,
+    /** Run direct triggers the moment the word is recognized (partial result), not after the pause. */
+    val instantTriggers: Boolean = true,
+    /** How long the recognized trigger must stay unchanged before firing (0 = immediately). */
+    val instantDelayMs: Int = 150,
     /** "google" (Android speech, most accurate for Egyptian Arabic) or "vosk" (fully offline). */
     val commandEngine: String = "google",
     /** Run custom command triggers even without the wake word. */
@@ -73,6 +78,9 @@ class SettingsRepo(private val context: Context) {
         val demoSeeded = booleanPreferencesKey("demo_seeded")
         val demoTextV2 = booleanPreferencesKey("demo_text_v2")
         val demoV3 = booleanPreferencesKey("demo_v3")
+        val demoV4 = booleanPreferencesKey("demo_v4")
+        val instant = booleanPreferencesKey("instant_triggers")
+        val instantDelay = androidx.datastore.preferences.core.intPreferencesKey("instant_delay_ms")
         val engine = stringPreferencesKey("command_engine")
         val direct = booleanPreferencesKey("direct_triggers")
         val bubble = booleanPreferencesKey("floating_bubble")
@@ -105,6 +113,9 @@ class SettingsRepo(private val context: Context) {
             demoSeeded = p[K.demoSeeded] ?: d.demoSeeded,
             demoTextV2 = p[K.demoTextV2] ?: d.demoTextV2,
             demoV3 = p[K.demoV3] ?: d.demoV3,
+            demoV4 = p[K.demoV4] ?: d.demoV4,
+            instantTriggers = p[K.instant] ?: d.instantTriggers,
+            instantDelayMs = p[K.instantDelay] ?: d.instantDelayMs,
             commandEngine = p[K.engine] ?: d.commandEngine,
             directTriggers = p[K.direct] ?: d.directTriggers,
             floatingBubble = p[K.bubble] ?: d.floatingBubble,
@@ -141,6 +152,9 @@ class SettingsRepo(private val context: Context) {
     suspend fun setDemoSeeded(v: Boolean) = edit { it[K.demoSeeded] = v }
     suspend fun setDemoTextV2(v: Boolean) = edit { it[K.demoTextV2] = v }
     suspend fun setDemoV3(v: Boolean) = edit { it[K.demoV3] = v }
+    suspend fun setDemoV4(v: Boolean) = edit { it[K.demoV4] = v }
+    suspend fun setInstantTriggers(v: Boolean) = edit { it[K.instant] = v }
+    suspend fun setInstantDelay(v: Int) = edit { it[K.instantDelay] = v }
     suspend fun setCommandEngine(v: String) = edit { it[K.engine] = v }
     suspend fun setDirectTriggers(v: Boolean) = edit { it[K.direct] = v }
     suspend fun setFloatingBubble(v: Boolean) = edit { it[K.bubble] = v }

@@ -24,7 +24,7 @@ object DemoSeeder {
                 triggers = listOf("واحد"),
                 steps = listOf(
                     Step.AttachPhotos(count = 2, packageName = pkg, label = label, text = DEMO_TEXT),
-                    Step.Wait(800),
+                    Step.Wait(300),
                     Step.TypeText(DEMO_TEXT),
                     Step.PressSend,
                 ),
@@ -33,17 +33,23 @@ object DemoSeeder {
         c.settings.setDemoSeeded(true)
         c.settings.setDemoTextV2(true)
         c.settings.setDemoV3(true)
+        c.settings.setDemoV4(true)
     }
 
-    /** Faster demo: the typing step already waits for the text field, so 1.5 s → 0.8 s. */
+    /**
+     * Faster demo: typing waits for the text field and "send" waits until the button is
+     * enabled (photos uploaded), so the fixed pause can be tiny: 1.5 s / 0.8 s → 0.3 s.
+     */
     private suspend fun migrateDemoWait(c: AppContainer) {
-        if (c.settings.current().demoV3) return
+        if (c.settings.current().demoV4) return
+        val old = setOf(Step.Wait(1500), Step.Wait(800))
         c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
-            if (cmd.steps.any { it == Step.Wait(1500) }) {
-                c.repo.save(cmd.copy(steps = cmd.steps.map { if (it == Step.Wait(1500)) Step.Wait(800) else it }))
+            if (cmd.steps.any { it in old }) {
+                c.repo.save(cmd.copy(steps = cmd.steps.map { if (it in old) Step.Wait(300) else it }))
             }
         }
         c.settings.setDemoV3(true)
+        c.settings.setDemoV4(true)
     }
 
     /** Updates the demo created by older versions ("حلهم") to the new text, unless the user edited it. */

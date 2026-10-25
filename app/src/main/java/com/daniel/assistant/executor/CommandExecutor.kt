@@ -213,7 +213,9 @@ class CommandExecutor(
 
     private suspend fun pressSend(): String? {
         val s = service() ?: return NO_ACCESSIBILITY
-        val node = waitFor { NodeActions.findSendButton(it.root()) }
+        // Wait until the send button is enabled (e.g. photos finished attaching), then tap.
+        val enabled = waitFor(10_000) { NodeActions.findSendButton(it.root())?.takeIf { n -> n.isEnabled } }
+        val node = enabled ?: NodeActions.findSendButton(s.root())
         if (node != null && NodeActions.clickNode(s, node)) return null
         // Fallback: the keyboard's "send/enter" action on the text field.
         val edit = NodeActions.findEditableNode(s.root())

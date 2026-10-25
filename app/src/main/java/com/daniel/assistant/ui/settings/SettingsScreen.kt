@@ -183,6 +183,23 @@ fun SettingsScreen(
                         } else "خدمة Google للتعرف على الكلام مش موجودة على الموبايل ده — هيتستخدم Vosk.",
                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp),
                     )
+                    SettingSwitch(
+                        "⚡ تنفيذ لحظي",
+                        "أوامرك (زي \"واحد\") تتنفذ أول ما الكلمة تتفهم، من غير ما يستنى سكوتك",
+                        settings.instantTriggers,
+                    ) { v -> scope.launch { c.settings.setInstantTriggers(v) } }
+                    if (settings.instantTriggers) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0 to "أسرع حاجة", 150 to "متوازن", 350 to "أضمن").forEach { (ms, label) ->
+                                FilterChip(settings.instantDelayMs == ms, { scope.launch { c.settings.setInstantDelay(ms) } },
+                                    { Text(label) }, colors = chipColors())
+                            }
+                        }
+                        Text(
+                            "\"أسرع حاجة\" بينفّذ فورًا، بس ممكن يشتغل لو الكلمة جت في نص كلامك. \"أضمن\" بيستنى لحظة صغيرة يتأكد إنك خلصت.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     SettingSwitch("أوامري من غير كلمة التنبيه", "قول \"واحد\" على طول من غير \"${settings.wakeWord}\"", settings.directTriggers) { v ->
                         scope.launch { c.settings.setDirectTriggers(v) }
                     }

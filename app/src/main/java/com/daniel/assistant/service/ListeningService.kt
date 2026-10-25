@@ -110,6 +110,12 @@ class ListeningService : Service() {
     /** Wake word was already acted on from a partial result; skip it in the final one. */
     private var wakeFromPartial = false
     private var wakeFromPartialAt = 0L
+    private var instantTriggers = true
+    private var instantDelayMs = 150L
+    private var instantJob: Job? = null
+    /** Trigger already fired from a partial result; its final result must be ignored. */
+    private var firedInstant: String? = null
+    private var firedInstantAt = 0L
     private lateinit var bubble: FloatingBubble
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -204,6 +210,8 @@ class ListeningService : Service() {
                     directTriggers = st.directTriggers
                     voicePrint = if (st.voiceLock) com.daniel.assistant.voice.SpeakerLock.decode(st.voicePrint) else null
                     voiceThreshold = st.voiceLockThreshold
+                    instantTriggers = st.instantTriggers
+                    instantDelayMs = st.instantDelayMs.toLong()
                     if (st.floatingBubble) bubble.show() else bubble.hide()
                 }
             }
@@ -288,6 +296,7 @@ class ListeningService : Service() {
                 onPartial = { p ->
                     _state.value = _state.value.copy(partial = p)
                     checkPartialWake(p)
+                    checkInstantTrigger(p)
                 },
                 onError = { e ->
                     c.log.error("خطأ في الميكروفون: ${e.message}")
@@ -318,9 +327,43 @@ class ListeningService : Service() {
         startCommandCapture()
     }
 
+    /**
+     * Instant triggers: as soon as the partial result is exactly one of the user's triggers
+     * ("واحد", or "يا مساعد واحد"), run it — no waiting for the pause after the word.
+     * A short stability delay avoids firing on the first word of a longer sentence.
+     */
+    private fun checkInstantTrigger(partial: String) {
+        instantJob?.cancel()
+        if (!instantTriggers || !directTriggers || voicePrint != null || _state.value.awaitingCommand) return
+        if (listenJob?.isActive == true || c.executor.running.value != null || c.ai.running.value) return
+        val t = ArabicNormalizer.normalize(partial)
+        val core = afterWakeWord(t)?.takeIf { it.isNotBlank() } ?: t
+        val key = ArabicNormalizer.phonetic(core)
+        if (key.isBlank() || key == firedInstant) return
+        val cmd = cachedCommands.firstOrNull { cmd ->
+            cmd.enabled && cmd.triggers.any { tr ->
+                !com.daniel.assistant.commands.Variables.hasVariables(tr) && ArabicNormalizer.phonetic(tr) == key
+            }
+        } ?: return
+        instantJob = scope.launch {
+            if (instantDelayMs > 0) delay(instantDelayMs)
+            firedInstant = key
+            firedInstantAt = android.os.SystemClock.uptimeMillis()
+            c.brain.runInstant(cmd, partial)
+        }
+    }
+
     private fun onResult(raw: String) {
         val text = ArabicNormalizer.normalize(raw)
         _state.value = _state.value.copy(partial = "")
+        instantJob?.cancel()
+        firedInstant?.let { fired ->
+            val recent = android.os.SystemClock.uptimeMillis() - firedInstantAt < 4_000
+            firedInstant = null
+            val core = afterWakeWord(text)?.takeIf { it.isNotBlank() } ?: text
+            // The final result of an instantly-fired trigger: already done.
+            if (recent && ArabicNormalizer.phonetic(core).startsWith(fired)) return
+        }
         c.brain.markSpeechEnd()
         if (wakeFromPartial && android.os.SystemClock.uptimeMillis() - wakeFromPartialAt > 4_000) wakeFromPartial = false
         if (wakeFromPartial) {

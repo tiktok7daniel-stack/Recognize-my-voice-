@@ -238,6 +238,14 @@ class AssistantBrain(private val c: AppContainer) {
         if (ms in 0..15_000) c.log.info("⏱ زمن الاستجابة ${ms}ms — $text")
     }
 
+    /** Runs a custom command recognized instantly from a partial result. */
+    fun runInstant(cmd: com.daniel.assistant.commands.CustomCommand, heard: String) {
+        speechEndAt = android.os.SystemClock.uptimeMillis()
+        _lastHeard.value = heard
+        result("أمر لحظي: ${cmd.name}")
+        c.executor.run(cmd)
+    }
+
     /** Called by the listener when the offline engine finished an utterance. */
     fun markSpeechEnd() { speechEndAt = android.os.SystemClock.uptimeMillis() }
 }

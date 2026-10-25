@@ -71,6 +71,7 @@ class ListeningService : Service() {
         private const val COMMAND_WINDOW_MS = 6_500L
 
         private val _state = MutableStateFlow(State())
+        @Volatile private var lastBlockedPrompt = 0L
         val state: StateFlow<State> = _state.asStateFlow()
 
         fun start(context: Context) {
@@ -142,6 +143,8 @@ class ListeningService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                // Explicit stop by the user: don't auto-restart until the app is opened again.
+                c.scope.launch { c.settings.setManualStop(true) }
                 stopEverything()
                 return START_NOT_STICKY
             }
@@ -152,6 +155,7 @@ class ListeningService : Service() {
         if (!goForeground()) return START_NOT_STICKY
         if (!started) {
             started = true
+            c.scope.launch { if (c.settings.current().manualStop) c.settings.setManualStop(false) }
             begin()
         } else if (pendingListenNow && modelReady) {
             pendingListenNow = false
@@ -166,8 +170,12 @@ class ListeningService : Service() {
         true
     } catch (e: Exception) {
         // e.g. Android 14+ refuses a microphone FGS started from the background / boot.
-        c.notifier.bootPrompt()
-        c.log.error("مقدرتش أشغل خدمة الاستماع: ${e.message}")
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastBlockedPrompt > 30 * 60_000L || lastBlockedPrompt == 0L) {
+            lastBlockedPrompt = now
+            c.notifier.bootPrompt()
+            c.log.error("النظام منع تشغيل الاستماع من الخلفية — اضغط الإشعار: ${e.message}")
+        }
         stopSelf()
         false
     }
@@ -497,6 +505,11 @@ class ListeningService : Service() {
         _state.value = State()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    /** Swiping the app away from Recents must NOT stop listening. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

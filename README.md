@@ -224,6 +224,18 @@ Used only when no offline command matched.
 In grammar mode, Nabra first says "قول الأمر" and then records your AI command in
 free-form mode, for that one utterance only.
 
+## Always on
+
+* Listening starts **automatically when the app opens**, with no tap needed, and keeps running in the
+  background, including after you swipe the app away from Recents.
+* The accessibility service, which Android keeps alive and re-binds after reboot, starts the
+  listener when it connects and acts as a **watchdog**: if the system killed the listener, it is
+  brought back within about 30 s.
+* *Start on boot* is on by default.
+* Pressing **Stop**, in the app or in the notification, is respected until the app is opened again.
+* If Android blocks a background microphone start, a notification asks you to tap it to resume.
+  This notification appears at most every 30 minutes.
+
 ## Battery and reliability
 
 * One recognizer, 16 kHz mono. Listening pauses while TTS speaks and while the screen

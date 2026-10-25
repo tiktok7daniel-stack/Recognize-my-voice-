@@ -174,7 +174,7 @@ fun HomeScreen(
                     }
                     Text(
                         when (orb) {
-                            OrbState.OFF -> "المساعد واقف"
+                            OrbState.OFF -> if (modelOk && micOk) "بيشغّل نفسه…" else "المساعد واقف"
                             OrbState.PAUSED -> "متوقف مؤقتًا"
                             OrbState.AWAITING -> "بسمعك… قول الأمر"
                             OrbState.IDLE -> "قول \"$wake\""

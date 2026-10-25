@@ -244,6 +244,11 @@ fun SettingsScreen(
                         }
                     }
                     SettingSwitch("وقّف الاستماع والشاشة مقفولة", "بيوفر بطارية", settings.pauseOnScreenOff) { v -> scope.launch { c.settings.setPauseOnScreenOff(v) } }
+                    SettingSwitch(
+                        "يشتغل لوحده على طول",
+                        "أول ما تفتح التطبيق بيبدأ يسمع، ويفضل شغال في الخلفية، ويرجع لوحده لو النظام قفله",
+                        settings.autoStart,
+                    ) { v -> scope.launch { c.settings.setAutoStart(v) } }
                     SettingSwitch("شغّل مع تشغيل الموبايل", "أندرويد 14+ ممكن يطلب منك تدوس على إشعار", settings.startOnBoot) { v -> scope.launch { c.settings.setStartOnBoot(v) } }
                     SettingSwitch(
                         "وضع الأوامر الدقيق (Grammar)",

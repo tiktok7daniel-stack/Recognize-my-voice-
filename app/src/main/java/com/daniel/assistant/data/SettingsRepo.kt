@@ -30,7 +30,7 @@ data class AppSettings(
     val wakeWord: String = "يا مساعد",
     val ttsEnabled: Boolean = true,
     val cueMode: CueMode = CueMode.BOTH,
-    val startOnBoot: Boolean = false,
+    val startOnBoot: Boolean = true,
     val pauseOnScreenOff: Boolean = true,
     val useGrammar: Boolean = true,
     val threshold: Float = 0.80f,
@@ -41,6 +41,10 @@ data class AppSettings(
     val demoV4: Boolean = false,
     /** Run direct triggers the moment the word is recognized (partial result), not after the pause. */
     val instantTriggers: Boolean = true,
+    /** Start listening automatically (app open, accessibility watchdog, boot). */
+    val autoStart: Boolean = true,
+    /** The user pressed Stop: don't auto-restart until they open the app again. */
+    val manualStop: Boolean = false,
     val telegramEnabled: Boolean = false,
     val telegramTokenEnc: String = "",
     val telegramChatId: String = "",
@@ -84,6 +88,8 @@ class SettingsRepo(private val context: Context) {
         val demoV3 = booleanPreferencesKey("demo_v3")
         val demoV4 = booleanPreferencesKey("demo_v4")
         val instant = booleanPreferencesKey("instant_triggers")
+        val autoStart = booleanPreferencesKey("auto_start")
+        val manualStop = booleanPreferencesKey("manual_stop")
         val tgEnabled = booleanPreferencesKey("tg_enabled")
         val tgToken = stringPreferencesKey("tg_token_enc")
         val tgChat = stringPreferencesKey("tg_chat")
@@ -123,6 +129,8 @@ class SettingsRepo(private val context: Context) {
             demoV3 = p[K.demoV3] ?: d.demoV3,
             demoV4 = p[K.demoV4] ?: d.demoV4,
             instantTriggers = p[K.instant] ?: d.instantTriggers,
+            autoStart = p[K.autoStart] ?: d.autoStart,
+            manualStop = p[K.manualStop] ?: d.manualStop,
             telegramEnabled = p[K.tgEnabled] ?: d.telegramEnabled,
             telegramTokenEnc = p[K.tgToken] ?: d.telegramTokenEnc,
             telegramChatId = p[K.tgChat] ?: d.telegramChatId,
@@ -166,6 +174,8 @@ class SettingsRepo(private val context: Context) {
     suspend fun setDemoV3(v: Boolean) = edit { it[K.demoV3] = v }
     suspend fun setDemoV4(v: Boolean) = edit { it[K.demoV4] = v }
     suspend fun setInstantTriggers(v: Boolean) = edit { it[K.instant] = v }
+    suspend fun setAutoStart(v: Boolean) = edit { it[K.autoStart] = v }
+    suspend fun setManualStop(v: Boolean) = edit { it[K.manualStop] = v }
     suspend fun setTelegramEnabled(v: Boolean) = edit { it[K.tgEnabled] = v }
     suspend fun setTelegramChatId(v: String) = edit { it[K.tgChat] = v }
     suspend fun setTelegramToken(plain: String) = edit {

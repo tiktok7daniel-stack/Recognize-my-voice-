@@ -21,11 +21,15 @@ class AssistantAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         _instance.value = this
+        // The system keeps accessibility services alive (and binds them after reboot):
+        // use that to bring the listener up automatically.
+        com.daniel.assistant.service.AutoStarter.tryStart(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
         lastEventAt = SystemClock.uptimeMillis()
+        com.daniel.assistant.service.AutoStarter.watchdog(this)
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             event.packageName?.toString()?.let { pkg ->
                 // Ignore our own overlays and the system UI shade.

@@ -57,6 +57,12 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    override fun onResume() {
+        super.onResume()
+        // Opening the app = assistant on, no need to tap anything.
+        com.daniel.assistant.service.AutoStarter.tryStart(this, fromAppOpen = true)
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         handleListenIntent(intent)

@@ -134,6 +134,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
     }
     var millis by remember { mutableFloatStateOf(((initial as? Step.Wait)?.millis ?: 1500L).toFloat()) }
     var chatUrl by remember { mutableStateOf((initial as? Step.AttachPhotos)?.chatUrl ?: "") }
+    var viaPicker by remember { mutableStateOf((initial as? Step.AttachPhotos)?.viaPicker ?: false) }
     var down by remember { mutableStateOf((initial as? Step.Scroll)?.down ?: true) }
     var sys by remember { mutableStateOf((initial as? Step.System)?.let { SysAction.byId(it.actionId) } ?: SysAction.VOLUME_UP) }
     var pickApp by remember { mutableStateOf(false) }
@@ -145,6 +146,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                 count.roundToInt(), it.packageName, it.label,
                 text = text.takeIf { t -> t.isNotBlank() && chatUrl.isBlank() },
                 chatUrl = chatUrl.trim().takeIf { u -> u.startsWith("http") },
+                viaPicker = viaPicker && chatUrl.isNotBlank(),
             )
         }
         StepType.ATTACH_IN_CHAT -> Step.AttachInChat(count.roundToInt())
@@ -186,6 +188,12 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (chatUrl.isBlank()) Neo.TextDim else Neo.Success,
                             )
+                            if (chatUrl.isNotBlank()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(!viaPicker, { viaPicker = false }, { Text("مشاركة (أسرع)") }, colors = chipColors())
+                                    FilterChip(viaPicker, { viaPicker = true }, { Text("قايمة الصور") }, colors = chipColors())
+                                }
+                            }
                             if (chatUrl.isBlank()) NeoTextField(text, { text = it }, "نص يتبعت مع الصور (اختياري)")
                             Text("بيتبعتوا مباشرة للتطبيق بالمشاركة (أضمن من الضغط على الشاشة).", style = MaterialTheme.typography.bodySmall)
                         }

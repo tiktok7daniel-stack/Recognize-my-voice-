@@ -276,7 +276,7 @@ class ExistingChatTest {
         val out = com.daniel.assistant.commands.ChatLinks.sendToExistingChat(steps, url)
         assertEquals(
             listOf(
-                Step.OpenUrl(url, "com.anthropic.claude"), Step.AttachInChat(2),
+                Step.AttachPhotos(2, "com.anthropic.claude", "Claude", null, url),
                 Step.Wait(300), Step.TypeText("حلهم"), Step.PressSend,
             ),
             out,

@@ -240,38 +240,15 @@ class CommandExecutor(
         return if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, uri))) null else "مقدرتش أفتح اللينك"
     }
 
-    /** Per-app learned way to get photos into an already-open chat ("share" or "picker"). */
-    private val attachPrefs by lazy { context.getSharedPreferences("attach_mode_v2", Context.MODE_PRIVATE) }
-
-    /** Texts in the top bar of the current screen (chat title) — used to detect "new chat". */
-    private fun topBarTexts(): Set<String> {
-        val s = service() ?: return emptySet()
-        val limit = s.resources.displayMetrics.heightPixels * 0.16f
-        val r = android.graphics.Rect()
-        // Only real text (the chat title), not icon descriptions like "Back" / "More" that every chat has.
-        val generic = setOf("claude", "new chat", "chat", "محادثه جديده", "nuova chat")
-        return NodeActions.visibleNodes(s.root()).mapNotNull { n ->
-            n.getBoundsInScreen(r)
-            if (r.top > limit || n.isEditable) null
-            else n.text?.toString()?.trim()?.takeIf { it.length in 3..80 && it.lowercase() !in generic }
-        }.toSet()
-    }
-
-    /**
-     * Idea: open the chat first, then share the photos to the app exactly like before.
-     * Returns true when they landed in the SAME chat (title unchanged), false when the app
-     * opened a new chat instead, null when sharing itself failed.
-     */
-    private suspend fun shareIntoOpenChat(step: Step.AttachPhotos, pkg: String): Boolean? {
+    /** Share the photos to [pkg] while its chat is open (they land in that chat), then wait for the composer. */
+    private suspend fun shareIntoOpenChat(step: Step.AttachPhotos, pkg: String): String? {
         waitFor(4_000) { NodeActions.findEditableNode(it.root()) }
-        val before = topBarTexts()
         delay(350)
-        PhotoSharer.share(context, pkg, step.count.coerceIn(1, 20))?.let { log.error(it); return null }
+        PhotoSharer.share(context, pkg, step.count.coerceIn(1, 20))?.let { return it }
         waitForForeground(pkg)
-        waitFor(4_000) { NodeActions.findEditableNode(it.root()) } ?: return false
-        delay(500)
-        val after = topBarTexts()
-        return before.isNotEmpty() && before.intersect(after).isNotEmpty()
+        waitFor(4_000) { NodeActions.findEditableNode(it.root()) }
+        delay(400)
+        return null
     }
 
     /** Attaches the newest [count] photos inside the open chat (+ → Photos → pick → Done). */
@@ -322,24 +299,12 @@ class CommandExecutor(
             val pkg = step.packageName.ifBlank { null }
                 ?: com.daniel.assistant.commands.ChatLinks.packageFor(step.chatUrl) ?: return "مش عارف التطبيق بتاع اللينك ده"
             openUrl(step.chatUrl, pkg)?.let { return it }
-            if (attachPrefs.getString(pkg, null) != "picker") {
-                val t0 = SystemClock.uptimeMillis()
-                when (shareIntoOpenChat(step, pkg)) {
-                    true -> {
-                        attachPrefs.edit().putString(pkg, "share").apply()
-                        log.info("الصور اتبعتت مشاركة لنفس الشات في ${SystemClock.uptimeMillis() - t0}ms")
-                        return null
-                    }
-                    false -> {
-                        // The app opened a NEW chat: remember, go back to the right chat, use the picker.
-                        attachPrefs.edit().putString(pkg, "picker").apply()
-                        log.info("التطبيق فتح شات جديد مع المشاركة — هستخدم قايمة الصور جوه الشات")
-                        openUrl(step.chatUrl, pkg)?.let { return it }
-                    }
-                    null -> Unit
-                }
-            }
-            return attachViaPicker(step.count)
+            if (step.viaPicker) return attachViaPicker(step.count)
+            // Open chat first, then share exactly like before: the photos land in this open chat.
+            val t0 = SystemClock.uptimeMillis()
+            shareIntoOpenChat(step, pkg)?.let { return it }
+            log.info("الصور اتبعتت مشاركة للشات في ${SystemClock.uptimeMillis() - t0}ms")
+            return null
         }
         val target = resolvePackage(step.packageName, step.label) ?: return "التطبيق \"${step.label}\" مش متثبت"
         PhotoSharer.share(context, target, step.count.coerceIn(1, 20), step.text)?.let { return it }

@@ -14,6 +14,7 @@ object DemoSeeder {
         if (c.settings.current().demoSeeded) {
             migrateDemoWait(c)
             migrateToMathChat(c)
+            cleanUpOne(c)
             return
         }
         val apps = c.appEntries()
@@ -39,6 +40,30 @@ object DemoSeeder {
         c.settings.setDemoV3(true)
         c.settings.setDemoV4(true)
         c.settings.setDemoV5(true)
+        c.settings.setDemoV6(true)
+    }
+
+    /**
+     * "واحد" = open the رياضة chat + share the 2 photos (once), short pause, type, send.
+     * Removes leftovers from earlier versions (extra "attach in chat", duplicate open steps).
+     */
+    private suspend fun cleanUpOne(c: AppContainer) {
+        if (c.settings.current().demoV6) return
+        c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
+            val share = cmd.steps.filterIsInstance<Step.AttachPhotos>().firstOrNull() ?: return@forEach
+            val url = share.chatUrl ?: return@forEach
+            val fixed = share.copy(viaPicker = false, text = null)
+            val rest = cmd.steps.filterNot { st ->
+                st is Step.AttachPhotos || st is Step.AttachInChat ||
+                    (st is Step.OpenUrl && st.url.trim() == url.trim()) ||
+                    (st is Step.OpenApp && st.packageName == share.packageName)
+            }
+            val steps = mutableListOf<Step>(fixed)
+            if (rest.firstOrNull() !is Step.Wait) steps.add(Step.Wait(300))
+            steps.addAll(rest)
+            c.repo.save(cmd.copy(steps = steps))
+        }
+        c.settings.setDemoV6(true)
     }
 
     /** "واحد" → the existing "رياضة" chat (no new chat), and skip the separate "open Claude" step. */

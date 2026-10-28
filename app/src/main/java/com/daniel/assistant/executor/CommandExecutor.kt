@@ -111,10 +111,8 @@ class CommandExecutor(
         is Step.Scroll -> service()?.let { if (NodeActions.scroll(it, step.down)) null else "مفيش حاجة تتعمل لها سكرول" }
             ?: NO_ACCESSIBILITY
         is Step.System -> SysAction.byId(step.actionId)?.let { runSystem(it, step.arg) } ?: "أمر غير معروف"
-        is Step.OpenUrl -> {
-            val url = step.url.trim().let { if (it.contains("://")) it else "https://$it" }
-            if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))) null else "مقدرتش أفتح اللينك"
-        }
+        is Step.OpenUrl -> openUrl(step.url, step.packageName)
+        is Step.AttachInChat -> attachInChat(step.count)
     }
 
     // ---------- building blocks used by skills ----------
@@ -224,7 +222,57 @@ class CommandExecutor(
         return null
     }
 
+    /** Opens a link — inside the given/auto-detected app when possible (e.g. a Claude chat). */
+    suspend fun openUrl(raw: String, packageName: String?): String? {
+        val url = raw.trim().let { if (it.contains("://") || it.startsWith("tel:")) it else "https://$it" }
+        val uri = android.net.Uri.parse(url)
+        val pkg = (packageName ?: com.daniel.assistant.commands.ChatLinks.packageFor(url))?.takeIf { appIndex.isInstalled(it) }
+        if (pkg != null) {
+            val inApp = Intent(Intent.ACTION_VIEW, uri).setPackage(pkg).addCategory(Intent.CATEGORY_BROWSABLE)
+            if (AppLauncher.start(context, inApp)) {
+                waitForForeground(pkg)
+                return null
+            }
+        }
+        return if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, uri))) null else "مقدرتش أفتح اللينك"
+    }
+
+    private val PHOTO_OPTION = listOf("photos", "photo library", "gallery", "images", "library", "choose photo", "upload photo",
+        "الصور", "صور", "المعرض", "الاستوديو", "foto", "galleria", "immagini")
+    private val CONFIRM = listOf("add", "done", "select", "upload", "attach", "ok", "send", "اضافه", "اضف", "تم", "اختيار",
+        "موافق", "ارفاق", "aggiungi", "fine", "seleziona", "carica", "allega")
+
+    /** Attaches the newest [count] photos from inside the open chat: + → Photos → pick → confirm. */
+    private suspend fun attachInChat(count: Int): String? {
+        val s = service() ?: return NO_ACCESSIBILITY
+        val attach = waitFor(7_000) { NodeActions.findAttachButton(it.root()) } ?: return "مش لاقي زرار الإرفاق (+) في الشات"
+        NodeActions.clickNode(s, attach)
+        delay(700)
+        // Many apps show a menu first (Camera / Photos / Files).
+        waitFor(2_000) { NodeActions.findByWords(it.root(), PHOTO_OPTION, exclude = listOf("camera", "كاميرا")) }
+            ?.let { NodeActions.clickNode(s, it); delay(900) }
+        val width = s.resources.displayMetrics.widthPixels
+        val thumbs = waitFor(6_000) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
+            ?: return "مش لاقي الصور في القايمة"
+        thumbs.take(count.coerceIn(1, 20)).forEach { t ->
+            NodeActions.clickNode(s, t)
+            delay(300)
+        }
+        delay(300)
+        // Multi-select pickers need a confirm button; single-pick ones return by themselves.
+        waitFor(2_500) { NodeActions.findByWords(it.root(), CONFIRM, exclude = listOf("cancel", "الغاء", "annulla")) }
+            ?.let { NodeActions.clickNode(s, it) }
+        delay(900)
+        return null
+    }
+
     private suspend fun attachPhotos(step: Step.AttachPhotos): String? {
+        if (!step.chatUrl.isNullOrBlank()) {
+            // Existing chat: open its link inside the app, then attach from inside the chat.
+            openUrl(step.chatUrl, step.packageName.ifBlank { null })?.let { return it }
+            delay(600)
+            return attachInChat(step.count)
+        }
         val target = resolvePackage(step.packageName, step.label) ?: return "التطبيق \"${step.label}\" مش متثبت"
         PhotoSharer.share(context, target, step.count.coerceIn(1, 20), step.text)?.let { return it }
         waitForForeground(target)

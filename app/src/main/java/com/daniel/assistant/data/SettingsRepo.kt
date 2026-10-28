@@ -39,6 +39,7 @@ data class AppSettings(
     val demoTextV2: Boolean = false,
     val demoV3: Boolean = false,
     val demoV4: Boolean = false,
+    val demoV5: Boolean = false,
     /** Run direct triggers the moment the word is recognized (partial result), not after the pause. */
     val instantTriggers: Boolean = true,
     /** Start listening automatically (app open, accessibility watchdog, boot). */
@@ -87,6 +88,7 @@ class SettingsRepo(private val context: Context) {
         val demoTextV2 = booleanPreferencesKey("demo_text_v2")
         val demoV3 = booleanPreferencesKey("demo_v3")
         val demoV4 = booleanPreferencesKey("demo_v4")
+        val demoV5 = booleanPreferencesKey("demo_v5")
         val instant = booleanPreferencesKey("instant_triggers")
         val autoStart = booleanPreferencesKey("auto_start")
         val manualStop = booleanPreferencesKey("manual_stop")
@@ -128,6 +130,7 @@ class SettingsRepo(private val context: Context) {
             demoTextV2 = p[K.demoTextV2] ?: d.demoTextV2,
             demoV3 = p[K.demoV3] ?: d.demoV3,
             demoV4 = p[K.demoV4] ?: d.demoV4,
+            demoV5 = p[K.demoV5] ?: d.demoV5,
             instantTriggers = p[K.instant] ?: d.instantTriggers,
             autoStart = p[K.autoStart] ?: d.autoStart,
             manualStop = p[K.manualStop] ?: d.manualStop,
@@ -173,6 +176,7 @@ class SettingsRepo(private val context: Context) {
     suspend fun setDemoTextV2(v: Boolean) = edit { it[K.demoTextV2] = v }
     suspend fun setDemoV3(v: Boolean) = edit { it[K.demoV3] = v }
     suspend fun setDemoV4(v: Boolean) = edit { it[K.demoV4] = v }
+    suspend fun setDemoV5(v: Boolean) = edit { it[K.demoV5] = v }
     suspend fun setInstantTriggers(v: Boolean) = edit { it[K.instant] = v }
     suspend fun setAutoStart(v: Boolean) = edit { it[K.autoStart] = v }
     suspend fun setManualStop(v: Boolean) = edit { it[K.manualStop] = v }

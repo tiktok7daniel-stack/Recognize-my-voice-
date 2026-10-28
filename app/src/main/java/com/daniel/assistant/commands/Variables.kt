@@ -65,5 +65,6 @@ fun Step.withVars(vars: Map<String, String>): Step = if (vars.isEmpty()) this el
     is Step.AttachPhotos -> copy(text = text?.let { Variables.fill(it, vars) })
     is Step.System -> copy(arg = arg?.let { Variables.fill(it, vars) })
     is Step.OpenUrl -> copy(url = Variables.fill(url, vars))
+    is Step.AttachInChat -> this
     else -> this
 }

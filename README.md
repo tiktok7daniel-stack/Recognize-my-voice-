@@ -105,6 +105,19 @@ You can pick a model or paste a custom zip URL in *Settings → Voice model*.
   and `/stop` cancels.
 * **Free online model presets**: OpenRouter, NVIDIA and Groq.
 
+## Send to an existing chat (not a new one)
+
+Sharing photos to an app always starts a **new** chat. To keep using the same chat:
+
+* The *Attach last N photos* step has an optional **chat link** field (for example
+  `https://claude.ai/chat/…`). When it is set, Nabra opens that exact chat inside the app, taps
+  **+ → Photos**, selects the newest photos, confirms, and the next steps type and send in the
+  same chat.
+* The new step types *Open link / specific chat* and *Attach photos inside the open chat* can be
+  used separately in any command. Links for Claude, ChatGPT, Gemini, WhatsApp and Telegram open
+  inside the app.
+* The "واحد" command was migrated to the user's "رياضة" chat in Claude.
+
 ## Advanced features
 
 * **Variables in triggers**: `ابعت لـ {اسم} {رسالة}` matches "ابعت لأحمد أنا جاي". Steps can use

@@ -17,6 +17,8 @@ sealed class Step {
         val label: String,
         /** Optional text shared together with the photos (pre-fills the message in many apps). */
         val text: String? = null,
+        /** Send into this existing chat (link opened inside the app) instead of a new chat. */
+        val chatUrl: String? = null,
     ) : Step()
 
     @Serializable @SerialName("type_text")
@@ -41,7 +43,15 @@ sealed class Step {
     data class Scroll(val down: Boolean = true) : Step()
 
     @Serializable @SerialName("open_url")
-    data class OpenUrl(val url: String) : Step()
+    data class OpenUrl(
+        val url: String,
+        /** Open inside this app (e.g. a Claude chat link inside the Claude app), or null to auto-detect. */
+        val packageName: String? = null,
+    ) : Step()
+
+    /** Attach the newest photos from inside the chat that is already open (no new chat). */
+    @Serializable @SerialName("attach_in_chat")
+    data class AttachInChat(val count: Int = 2) : Step()
 
     @Serializable @SerialName("system")
     data class System(val actionId: String, val arg: String? = null) : Step()
@@ -49,7 +59,8 @@ sealed class Step {
     /** Short Arabic description for lists and notifications. */
     fun describe(): String = when (this) {
         is OpenApp -> "افتح $label"
-        is AttachPhotos -> "ابعت آخر $count صور لـ $label" + (text?.takeIf { it.isNotBlank() }?.let { " + \"$it\"" } ?: "")
+        is AttachPhotos -> if (!chatUrl.isNullOrBlank()) "ابعت آخر $count صور لشات معيّن في $label"
+            else "ابعت آخر $count صور لـ $label" + (text?.takeIf { it.isNotBlank() }?.let { " + \"$it\"" } ?: "")
         is TypeText -> "اكتب \"$text\""
         PressSend -> "دوس إرسال"
         is ClickText -> "اضغط على \"$text\""
@@ -57,14 +68,16 @@ sealed class Step {
         Back -> "رجوع"
         Home -> "الرئيسية"
         is Scroll -> if (down) "انزل" else "اطلع"
-        is OpenUrl -> "افتح $url"
+        is OpenUrl -> if (ChatLinks.isClaudeChat(url)) "افتح الشات في Claude" else "افتح $url"
+        is AttachInChat -> "ارفق آخر $count صور جوه الشات"
         is System -> SysAction.byId(actionId)?.title?.let { t -> if (arg.isNullOrBlank()) t else "$t: $arg" } ?: actionId
     }
 
     /** Steps that need the accessibility service to work. */
     val needsAccessibility: Boolean
         get() = when (this) {
-            is TypeText, PressSend, is ClickText, Back, Home, is Scroll -> true
+            is TypeText, PressSend, is ClickText, Back, Home, is Scroll, is AttachInChat -> true
+            is AttachPhotos -> !chatUrl.isNullOrBlank()
             is System -> SysAction.byId(actionId)?.needsAccessibility ?: false
             else -> false
         }
@@ -80,7 +93,8 @@ enum class StepType(val title: String) {
     BACK("رجوع"),
     HOME("الرئيسية"),
     SCROLL("سكرول"),
-    OPEN_URL("افتح لينك / موقع"),
+    OPEN_URL("افتح لينك / شات معيّن"),
+    ATTACH_IN_CHAT("ارفق صور جوه الشات المفتوح"),
     SYSTEM("أمر نظام"),
 }
 
@@ -95,6 +109,7 @@ fun Step.type(): StepType = when (this) {
     Step.Home -> StepType.HOME
     is Step.Scroll -> StepType.SCROLL
     is Step.OpenUrl -> StepType.OPEN_URL
+    is Step.AttachInChat -> StepType.ATTACH_IN_CHAT
     is Step.System -> StepType.SYSTEM
 }
 
@@ -121,4 +136,41 @@ object CommandJson {
         prettyPrint = false
     }
     val pretty = Json(json) { prettyPrint = true }
+}
+
+/** Helpers for sending to an existing chat instead of a new one. */
+object ChatLinks {
+    private val claudeChat = Regex("""https?://(www\.)?claude\.ai/chat/[0-9a-fA-F-]{8,}""")
+
+    fun isClaudeChat(url: String) = claudeChat.containsMatchIn(url.trim())
+    fun isShareLink(url: String) = url.contains("claude.ai/share/")
+
+    /** Best app to open a link inside (only well-known chat apps). */
+    fun packageFor(url: String): String? {
+        val u = url.lowercase()
+        return when {
+            u.contains("claude.ai/") -> "com.anthropic.claude"
+            u.contains("chatgpt.com/") || u.contains("chat.openai.com/") -> "com.openai.chatgpt"
+            u.contains("gemini.google.com/") -> "com.google.android.apps.bard"
+            u.contains("wa.me/") || u.contains("whatsapp.com/") -> "com.whatsapp"
+            u.contains("t.me/") -> "org.telegram.messenger"
+            else -> null
+        }
+    }
+
+    /**
+     * Turns "share photos to app" (which always starts a NEW chat) into
+     * "open this existing chat → attach photos inside it". Keeps every other step.
+     */
+    fun sendToExistingChat(steps: List<Step>, url: String): List<Step> {
+        val i = steps.indexOfFirst { it is Step.AttachPhotos }
+        if (i < 0) return steps
+        val share = steps[i] as Step.AttachPhotos
+        val before = steps.take(i).filterNot { it is Step.OpenApp && it.packageName == share.packageName }
+        val replacement = listOf(
+            Step.OpenUrl(url.trim(), packageFor(url) ?: share.packageName.ifBlank { null }),
+            Step.AttachInChat(share.count),
+        )
+        return before + replacement + steps.drop(i + 1)
+    }
 }

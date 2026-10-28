@@ -264,3 +264,24 @@ class AiIntentTest {
         assertTrue(r is Resolution.Skill)
     }
 }
+
+class ExistingChatTest {
+    @Test fun convertsShareToExistingChat() {
+        val url = "https://claude.ai/chat/33c15ca8-87ea-4824-aae8-c09a8c39cd0a"
+        val steps = listOf(
+            Step.OpenApp("com.anthropic.claude", "Claude"),
+            Step.AttachPhotos(2, "com.anthropic.claude", "Claude", "حلهم"),
+            Step.Wait(300), Step.TypeText("حلهم"), Step.PressSend,
+        )
+        val out = com.daniel.assistant.commands.ChatLinks.sendToExistingChat(steps, url)
+        assertEquals(
+            listOf(
+                Step.OpenUrl(url, "com.anthropic.claude"), Step.AttachInChat(2),
+                Step.Wait(300), Step.TypeText("حلهم"), Step.PressSend,
+            ),
+            out,
+        )
+        assertTrue(com.daniel.assistant.commands.ChatLinks.isClaudeChat(url))
+        assertTrue(!com.daniel.assistant.commands.ChatLinks.isClaudeChat("https://claude.ai/share/02503840-2253"))
+    }
+}

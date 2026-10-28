@@ -67,6 +67,7 @@ fun StepType.icon(): ImageVector = when (this) {
     StepType.HOME -> Icons.Filled.Home
     StepType.SCROLL -> Icons.Filled.SwapVert
     StepType.OPEN_URL -> Icons.Filled.Language
+    StepType.ATTACH_IN_CHAT -> Icons.Filled.PhotoLibrary
     StepType.SYSTEM -> Icons.Filled.Settings
 }
 
@@ -116,6 +117,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
             is Step.ClickText -> initial.text
             is Step.System -> initial.arg ?: ""
             is Step.AttachPhotos -> initial.text ?: ""
+            is Step.AttachInChat -> ""
             is Step.OpenUrl -> initial.url
             else -> ""
         }
@@ -127,15 +129,25 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
             else -> null
         }
     ) }
-    var count by remember { mutableFloatStateOf(((initial as? Step.AttachPhotos)?.count ?: 2).toFloat()) }
+    var count by remember {
+        mutableFloatStateOf(((initial as? Step.AttachPhotos)?.count ?: (initial as? Step.AttachInChat)?.count ?: 2).toFloat())
+    }
     var millis by remember { mutableFloatStateOf(((initial as? Step.Wait)?.millis ?: 1500L).toFloat()) }
+    var chatUrl by remember { mutableStateOf((initial as? Step.AttachPhotos)?.chatUrl ?: "") }
     var down by remember { mutableStateOf((initial as? Step.Scroll)?.down ?: true) }
     var sys by remember { mutableStateOf((initial as? Step.System)?.let { SysAction.byId(it.actionId) } ?: SysAction.VOLUME_UP) }
     var pickApp by remember { mutableStateOf(false) }
 
     val result: Step? = when (type) {
         StepType.OPEN_APP -> app?.let { Step.OpenApp(it.packageName, it.label) }
-        StepType.ATTACH_PHOTOS -> app?.let { Step.AttachPhotos(count.roundToInt(), it.packageName, it.label, text.takeIf { t -> t.isNotBlank() }) }
+        StepType.ATTACH_PHOTOS -> app?.let {
+            Step.AttachPhotos(
+                count.roundToInt(), it.packageName, it.label,
+                text = text.takeIf { t -> t.isNotBlank() && chatUrl.isBlank() },
+                chatUrl = chatUrl.trim().takeIf { u -> u.startsWith("http") },
+            )
+        }
+        StepType.ATTACH_IN_CHAT -> Step.AttachInChat(count.roundToInt())
         StepType.TYPE_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.TypeText(it) }
         StepType.CLICK_TEXT -> text.takeIf { it.isNotBlank() }?.let { Step.ClickText(it.trim()) }
         StepType.WAIT -> Step.Wait(millis.roundToInt().toLong())
@@ -167,7 +179,14 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                                 value = count, onValueChange = { count = it }, valueRange = 1f..10f, steps = 8,
                                 colors = SliderDefaults.colors(thumbColor = Neo.Pill, activeTrackColor = Neo.Accent),
                             )
-                            NeoTextField(text, { text = it }, "نص يتبعت مع الصور (اختياري)")
+                            NeoTextField(chatUrl, { chatUrl = it }, "لينك شات معيّن (اختياري)")
+                            Text(
+                                if (chatUrl.isBlank()) "فاضي = شات جديد. لو حطيت لينك شات (زي claude.ai/chat/...) الصور هتروح لنفس الشات ده."
+                                else "✅ الصور هتروح للشات ده بالظبط، مش شات جديد.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (chatUrl.isBlank()) Neo.TextDim else Neo.Success,
+                            )
+                            if (chatUrl.isBlank()) NeoTextField(text, { text = it }, "نص يتبعت مع الصور (اختياري)")
                             Text("بيتبعتوا مباشرة للتطبيق بالمشاركة (أضمن من الضغط على الشاشة).", style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -176,7 +195,18 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                         Text("تقدر تكتب متغير زي {رسالة} لو كلمة التشغيل فيها متغيرات.", style = MaterialTheme.typography.bodySmall)
                     }
                     StepType.CLICK_TEXT -> NeoTextField(text, { text = it }, "النص أو الوصف اللي على الزرار")
-                    StepType.OPEN_URL -> NeoTextField(text, { text = it }, "اللينك (مثلاً youtube.com أو tel:0100…)")
+                    StepType.OPEN_URL -> {
+                        NeoTextField(text, { text = it }, "اللينك (شات claude.ai/chat/… أو موقع أو tel:0100…)")
+                        Text("لينكات كلود وChatGPT وواتساب وتليجرام بتتفتح جوه التطبيق نفسه على نفس الشات.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    StepType.ATTACH_IN_CHAT -> {
+                        Text("عدد الصور: ${count.roundToInt()}")
+                        Slider(
+                            value = count, onValueChange = { count = it }, valueRange = 1f..10f, steps = 8,
+                            colors = SliderDefaults.colors(thumbColor = Neo.Pill, activeTrackColor = Neo.Accent),
+                        )
+                        Text("بيدوس + في الشات المفتوح ويختار أحدث الصور — حطها بعد خطوة \"افتح لينك\".", style = MaterialTheme.typography.bodySmall)
+                    }
                     StepType.WAIT -> {
                         Text("${millis.roundToInt()} ms")
                         Slider(

@@ -152,6 +152,70 @@ object NodeActions {
         return best
     }
 
+    private val ATTACH_WORDS = listOf(
+        "attach", "add", "plus", "upload", "media", "photo", "image", "gallery", "file",
+        "ارفاق", "مرفق", "اضافه", "اضف", "صور", "صوره", "allega", "aggiungi", "carica",
+    )
+    private val ATTACH_EXCLUDE = listOf("send", "ارسال", "camera", "كاميرا", "voice", "mic", "صوت", "invia", "fotocamera")
+
+    private fun labels(n: AccessibilityNodeInfo): String = listOfNotNull(
+        n.contentDescription, n.text, n.viewIdResourceName?.substringAfterLast('/'),
+    ).joinToString(" ") { ArabicNormalizer.normalize(it.toString()) }
+
+    /** The "+" / attach button of a chat composer (closest to the text field). */
+    fun findAttachButton(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        val nodes = visibleNodes(root)
+        val edit = findEditableNode(root)
+        val er = edit?.let { Rect().also { r -> it.getBoundsInScreen(r) } }
+        return nodes.filter { n ->
+            val l = labels(n)
+            !n.isEditable && (n.isClickable || clickableParent(n) != null) &&
+                ATTACH_WORDS.any { l.contains(it) } && ATTACH_EXCLUDE.none { l.contains(it) }
+        }.minByOrNull { n ->
+            if (er == null) 0.0 else {
+                val r = Rect(); n.getBoundsInScreen(r)
+                hypot((r.centerX() - er.centerX()).toDouble(), (r.centerY() - er.centerY()).toDouble())
+            }
+        }
+    }
+
+    /** First clickable node whose label contains one of [words] (normalized). */
+    fun findByWords(root: AccessibilityNodeInfo?, words: List<String>, exclude: List<String> = emptyList()): AccessibilityNodeInfo? {
+        val w = words.map { ArabicNormalizer.normalize(it) }
+        val ex = exclude.map { ArabicNormalizer.normalize(it) }
+        return visibleNodes(root).firstOrNull { n ->
+            val l = labels(n)
+            l.isNotBlank() && w.any { l == it || l.split(' ').contains(it) || (it.length > 4 && l.contains(it)) } &&
+                ex.none { l.contains(it) } && (n.isClickable || clickableParent(n) != null)
+        }
+    }
+
+    /**
+     * Photo thumbnails in a picker grid, newest first (accessibility order follows the
+     * picker's own order, which is newest-first in RTL and LTR alike).
+     */
+    fun findThumbnails(root: AccessibilityNodeInfo?, screenWidth: Int): List<AccessibilityNodeInfo> {
+        val photoWords = listOf("photo", "image", "picture", "صوره", "صور", "foto", "immagine", "taken", "التقطت", "video")
+        val out = mutableListOf<AccessibilityNodeInfo>()
+        val r = Rect()
+        walk(root) { n ->
+            if (!n.isVisibleToUser) return@walk
+            n.getBoundsInScreen(r)
+            val w = r.width(); val h = r.height()
+            if (w < screenWidth * 0.14 || w > screenWidth * 0.6 || h == 0) return@walk
+            val ratio = w.toFloat() / h
+            if (ratio < 0.7f || ratio > 1.45f) return@walk
+            val l = labels(n)
+            val looksPhoto = photoWords.any { l.contains(it) } ||
+                (n.className?.toString()?.contains("Image") == true && n.text.isNullOrBlank())
+            if (looksPhoto && (n.isClickable || n.isCheckable || clickableParent(n) != null)) {
+                val target = if (n.isClickable || n.isCheckable) n else clickableParent(n)!!
+                if (out.none { it == target }) out.add(target)
+            }
+        }
+        return out
+    }
+
     /** First on/off switch on screen (Wi-Fi / Bluetooth panels). */
     fun findSwitch(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? =
         visibleNodes(root).firstOrNull { n ->

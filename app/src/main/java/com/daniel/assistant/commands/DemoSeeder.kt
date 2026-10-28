@@ -6,11 +6,15 @@ import com.daniel.assistant.AppContainer
 object DemoSeeder {
     const val DEMO_TEXT = "حلهم بالترتيب بالإيطالي"
     private const val OLD_DEMO_TEXT = "حلهم"
+    /** The user's "رياضة" chat in Claude: "واحد" sends the photos there instead of a new chat. */
+    const val MATH_CHAT_URL = "https://claude.ai/chat/33c15ca8-87ea-4824-aae8-c09a8c39cd0a"
 
     suspend fun seedIfNeeded(c: AppContainer) {
         migrateDemoText(c)
         if (c.settings.current().demoSeeded) {
-            migrateDemoWait(c); return
+            migrateDemoWait(c)
+            migrateToMathChat(c)
+            return
         }
         val apps = c.appEntries()
         // Resolve Claude at runtime instead of trusting a hardcoded package name.
@@ -23,7 +27,7 @@ object DemoSeeder {
                 name = "واحد — صور لكلود",
                 triggers = listOf("واحد"),
                 steps = listOf(
-                    Step.AttachPhotos(count = 2, packageName = pkg, label = label, text = DEMO_TEXT),
+                    Step.AttachPhotos(count = 2, packageName = pkg.ifBlank { "com.anthropic.claude" }, label = label, chatUrl = MATH_CHAT_URL),
                     Step.Wait(300),
                     Step.TypeText(DEMO_TEXT),
                     Step.PressSend,
@@ -34,6 +38,21 @@ object DemoSeeder {
         c.settings.setDemoTextV2(true)
         c.settings.setDemoV3(true)
         c.settings.setDemoV4(true)
+        c.settings.setDemoV5(true)
+    }
+
+    /** "واحد" → the existing "رياضة" chat (no new chat), and skip the separate "open Claude" step. */
+    private suspend fun migrateToMathChat(c: AppContainer) {
+        if (c.settings.current().demoV5) return
+        c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
+            val share = cmd.steps.firstOrNull { it is Step.AttachPhotos && it.chatUrl.isNullOrBlank() && it.label.contains("Claude", true) }
+                as? Step.AttachPhotos ?: return@forEach
+            val steps = cmd.steps
+                .filterNot { it is Step.OpenApp && it.packageName == share.packageName }
+                .map { if (it == share) share.copy(chatUrl = MATH_CHAT_URL, text = null) else it }
+            c.repo.save(cmd.copy(steps = steps))
+        }
+        c.settings.setDemoV5(true)
     }
 
     /**

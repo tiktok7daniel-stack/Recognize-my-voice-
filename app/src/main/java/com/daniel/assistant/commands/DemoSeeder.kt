@@ -15,6 +15,7 @@ object DemoSeeder {
             migrateDemoWait(c)
             migrateToMathChat(c)
             cleanUpOne(c)
+            pickerInChat(c)
             return
         }
         val apps = c.appEntries()
@@ -41,6 +42,20 @@ object DemoSeeder {
         c.settings.setDemoV4(true)
         c.settings.setDemoV5(true)
         c.settings.setDemoV6(true)
+        c.settings.setDemoV7(true)
+    }
+
+    /** Sharing to Claude always starts a new chat, so "واحد" attaches from inside the رياضة chat. */
+    private suspend fun pickerInChat(c: AppContainer) {
+        if (c.settings.current().demoV7) return
+        c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
+            if (cmd.steps.any { it is Step.AttachPhotos && it.chatUrl != null && !it.viaPicker }) {
+                c.repo.save(cmd.copy(steps = cmd.steps.map {
+                    if (it is Step.AttachPhotos && it.chatUrl != null) it.copy(viaPicker = true) else it
+                }))
+            }
+        }
+        c.settings.setDemoV7(true)
     }
 
     /**
@@ -52,7 +67,7 @@ object DemoSeeder {
         c.repo.all().filter { "واحد" in it.triggers }.forEach { cmd ->
             val share = cmd.steps.filterIsInstance<Step.AttachPhotos>().firstOrNull() ?: return@forEach
             val url = share.chatUrl ?: return@forEach
-            val fixed = share.copy(viaPicker = false, text = null)
+            val fixed = share.copy(viaPicker = true, text = null)
             val rest = cmd.steps.filterNot { st ->
                 st is Step.AttachPhotos || st is Step.AttachInChat ||
                     (st is Step.OpenUrl && st.url.trim() == url.trim()) ||

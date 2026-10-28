@@ -299,8 +299,8 @@ class CommandExecutor(
             val pkg = step.packageName.ifBlank { null }
                 ?: com.daniel.assistant.commands.ChatLinks.packageFor(step.chatUrl) ?: return "مش عارف التطبيق بتاع اللينك ده"
             openUrl(step.chatUrl, pkg)?.let { return it }
+            // Default: attach from inside this chat (sharing makes Claude start a new chat).
             if (step.viaPicker) return attachViaPicker(step.count)
-            // Open chat first, then share exactly like before: the photos land in this open chat.
             val t0 = SystemClock.uptimeMillis()
             shareIntoOpenChat(step, pkg)?.let { return it }
             log.info("الصور اتبعتت مشاركة للشات في ${SystemClock.uptimeMillis() - t0}ms")

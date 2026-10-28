@@ -134,7 +134,7 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
     }
     var millis by remember { mutableFloatStateOf(((initial as? Step.Wait)?.millis ?: 1500L).toFloat()) }
     var chatUrl by remember { mutableStateOf((initial as? Step.AttachPhotos)?.chatUrl ?: "") }
-    var viaPicker by remember { mutableStateOf((initial as? Step.AttachPhotos)?.viaPicker ?: false) }
+    var viaPicker by remember { mutableStateOf((initial as? Step.AttachPhotos)?.viaPicker ?: true) }
     var down by remember { mutableStateOf((initial as? Step.Scroll)?.down ?: true) }
     var sys by remember { mutableStateOf((initial as? Step.System)?.let { SysAction.byId(it.actionId) } ?: SysAction.VOLUME_UP) }
     var pickApp by remember { mutableStateOf(false) }
@@ -190,8 +190,8 @@ fun StepParamsDialog(type: StepType, initial: Step?, onDismiss: () -> Unit, onSa
                             )
                             if (chatUrl.isNotBlank()) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(!viaPicker, { viaPicker = false }, { Text("مشاركة (أسرع)") }, colors = chipColors())
-                                    FilterChip(viaPicker, { viaPicker = true }, { Text("قايمة الصور") }, colors = chipColors())
+                                    FilterChip(viaPicker, { viaPicker = true }, { Text("جوه نفس الشات") }, colors = chipColors())
+                                    FilterChip(!viaPicker, { viaPicker = false }, { Text("مشاركة (ممكن تفتح شات جديد)") }, colors = chipColors())
                                 }
                             }
                             if (chatUrl.isBlank()) NeoTextField(text, { text = it }, "نص يتبعت مع الصور (اختياري)")

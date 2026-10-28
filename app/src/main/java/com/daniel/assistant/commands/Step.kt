@@ -19,8 +19,8 @@ sealed class Step {
         val text: String? = null,
         /** Send into this existing chat (link opened inside the app) instead of a new chat. */
         val chatUrl: String? = null,
-        /** With [chatUrl]: false = share to the app after opening the chat (fast), true = in-chat photo picker. */
-        val viaPicker: Boolean = false,
+        /** With [chatUrl]: true = attach from inside the open chat (stays in it), false = share (Claude opens a NEW chat). */
+        val viaPicker: Boolean = true,
     ) : Step()
 
     @Serializable @SerialName("type_text")
@@ -174,7 +174,7 @@ object ChatLinks {
             packageName = packageFor(url) ?: share.packageName,
             chatUrl = url.trim(),
             text = null,
-            viaPicker = false,
+            viaPicker = true,
         )
         return before + replacement + steps.drop(i + 1)
     }

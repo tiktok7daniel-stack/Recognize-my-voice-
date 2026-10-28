@@ -240,11 +240,6 @@ class CommandExecutor(
         return if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, uri))) null else "مقدرتش أفتح اللينك"
     }
 
-    private val PHOTO_OPTION = listOf("photos", "photo library", "gallery", "images", "library", "choose photo", "upload photo",
-        "الصور", "صور", "المعرض", "الاستوديو", "foto", "galleria", "immagini")
-    private val CONFIRM = listOf("add", "done", "select", "upload", "attach", "ok", "send", "اضافه", "اضف", "تم", "اختيار",
-        "موافق", "ارفاق", "aggiungi", "fine", "seleziona", "carica", "allega")
-
     private val attachPrefs by lazy { context.getSharedPreferences("attach_mode", Context.MODE_PRIVATE) }
 
     /**

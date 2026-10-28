@@ -240,67 +240,55 @@ class CommandExecutor(
         return if (AppLauncher.start(context, Intent(Intent.ACTION_VIEW, uri))) null else "مقدرتش أفتح اللينك"
     }
 
-    private val attachPrefs by lazy { context.getSharedPreferences("attach_mode", Context.MODE_PRIVATE) }
+    /** Per-app learned way to get photos into an already-open chat ("share" or "picker"). */
+    private val attachPrefs by lazy { context.getSharedPreferences("attach_mode_v2", Context.MODE_PRIVATE) }
+
+    /** Texts in the top bar of the current screen (chat title) — used to detect "new chat". */
+    private fun topBarTexts(): Set<String> {
+        val s = service() ?: return emptySet()
+        val limit = s.resources.displayMetrics.heightPixels * 0.16f
+        val r = android.graphics.Rect()
+        // Only real text (the chat title), not icon descriptions like "Back" / "More" that every chat has.
+        val generic = setOf("claude", "new chat", "chat", "محادثه جديده", "nuova chat")
+        return NodeActions.visibleNodes(s.root()).mapNotNull { n ->
+            n.getBoundsInScreen(r)
+            if (r.top > limit || n.isEditable) null
+            else n.text?.toString()?.trim()?.takeIf { it.length in 3..80 && it.lowercase() !in generic }
+        }.toSet()
+    }
 
     /**
-     * Attaches the newest [count] photos inside the open chat.
-     * Fast path: put the photos on the clipboard and paste them into the message box
-     * (instant, like pasting an image in WhatsApp). The result is remembered per app; apps
-     * that don't accept pasted images use the (optimized) + → Photos → pick → confirm path.
+     * Idea: open the chat first, then share the photos to the app exactly like before.
+     * Returns true when they landed in the SAME chat (title unchanged), false when the app
+     * opened a new chat instead, null when sharing itself failed.
      */
-    private suspend fun attachInChat(count: Int): String? {
-        val s = service() ?: return NO_ACCESSIBILITY
-        val pkg = s.currentPackage() ?: ""
-        val mode = attachPrefs.getString(pkg, null)
-        if (mode != "picker") {
-            val t0 = SystemClock.uptimeMillis()
-            if (pastePhotos(count)) {
-                attachPrefs.edit().putString(pkg, "paste").apply()
-                log.info("الصور اتلزقت في ${SystemClock.uptimeMillis() - t0}ms")
-                return null
-            }
-            if (mode == null) attachPrefs.edit().putString(pkg, "picker").apply()
-        }
-        return attachViaPicker(count)
+    private suspend fun shareIntoOpenChat(step: Step.AttachPhotos, pkg: String): Boolean? {
+        waitFor(4_000) { NodeActions.findEditableNode(it.root()) }
+        val before = topBarTexts()
+        delay(350)
+        PhotoSharer.share(context, pkg, step.count.coerceIn(1, 20))?.let { log.error(it); return null }
+        waitForForeground(pkg)
+        waitFor(4_000) { NodeActions.findEditableNode(it.root()) } ?: return false
+        delay(500)
+        val after = topBarTexts()
+        return before.isNotEmpty() && before.intersect(after).isNotEmpty()
     }
 
-    /** Clipboard paste of the photos into the focused message box. True when the UI changed. */
-    private suspend fun pastePhotos(count: Int): Boolean {
-        val uris = withContext(Dispatchers.IO) { PhotoSharer.copyLatestToCache(context, count.coerceIn(1, 10)) }
-        if (uris.isEmpty()) return false
-        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newUri(context.contentResolver, "photos", uris.first())
-        uris.drop(1).forEach { clip.addItem(android.content.ClipData.Item(it)) }
-        cm.setPrimaryClip(clip)
-        val edit = waitFor(4_000) { NodeActions.findEditableNode(it.root()) } ?: return false
-        val before = NodeActions.visibleNodes(service()?.root()).size
-        edit.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-        if (!edit.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return false
-        // Success = new attachment previews appear; failure = nothing (or a "content://" text).
-        val changed = waitFor(1_500) { sv ->
-            val root = sv.root()
-            val box = NodeActions.findEditableNode(root)
-            if (box?.text?.contains("content://") == true) false
-            else if (NodeActions.visibleNodes(root).size > before) true else null
-        } ?: false
-        if (!changed) NodeActions.findEditableNode(service()?.root())?.let { box ->
-            if (box.text?.contains("content://") == true) NodeActions.setText(box, "")
-        }
-        return changed
-    }
+    /** Attaches the newest [count] photos inside the open chat (+ → Photos → pick → Done). */
+    private suspend fun attachInChat(count: Int): String? = attachViaPicker(count)
 
+    private val CONFIRM = listOf("done", "add", "select", "upload", "attach", "ok", "تم", "اضافه", "اضف", "اختيار",
+        "موافق", "ارفاق", "fatto", "aggiungi", "fine", "seleziona", "carica", "allega")
     private val PHOTO_OPTION = listOf("photos", "photo library", "gallery", "images", "library", "choose photo", "upload photo",
         "الصور", "صور", "المعرض", "الاستوديو", "foto", "galleria", "immagini")
-    private val CONFIRM = listOf("add", "done", "select", "upload", "attach", "ok", "send", "اضافه", "اضف", "تم", "اختيار",
-        "موافق", "ارفاق", "aggiungi", "fine", "seleziona", "carica", "allega")
 
-    /** + → (Photos) → newest N → confirm, driven by polling instead of fixed pauses. */
+    /** + → (Photos) → each of the newest N tapped ONCE → Done → wait until back in the chat. */
     private suspend fun attachViaPicker(count: Int): String? {
         val s = service() ?: return NO_ACCESSIBILITY
+        val chatPkg = s.currentPackage()
         val width = s.resources.displayMetrics.widthPixels
         val attach = waitFor(5_000) { NodeActions.findAttachButton(it.root()) } ?: return "مش لاقي زرار الإرفاق (+) في الشات"
         NodeActions.clickNode(s, attach)
-        // Recent photos may already be in the sheet; otherwise open "Photos".
         var thumbs = waitFor(1_200) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
         if (thumbs == null) {
             waitFor(1_500) { NodeActions.findByWords(it.root(), PHOTO_OPTION, exclude = listOf("camera", "كاميرا")) }
@@ -308,23 +296,50 @@ class CommandExecutor(
             thumbs = waitFor(5_000) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
                 ?: return "مش لاقي الصور في القايمة"
         }
-        thumbs.take(count.coerceIn(1, 20)).forEach { t ->
+        val wanted = count.coerceIn(1, 20)
+        thumbs.take(wanted).forEach { t ->
             NodeActions.clickNode(s, t)
-            delay(120)
+            delay(180)
         }
-        // Multi-select pickers need a confirm button; single-pick ones return by themselves.
-        waitFor(1_500) { NodeActions.findByWords(it.root(), CONFIRM, exclude = listOf("cancel", "الغاء", "annulla")) }
-            ?.let { NodeActions.clickNode(s, it) }
-        // Back in the chat when the message box is visible again.
-        waitFor(3_000) { NodeActions.findEditableNode(it.root()) }
-        return null
+        // Done / Add — then make sure the picker really closed (retry once).
+        repeat(2) {
+            val confirm = waitFor(2_000) { NodeActions.findConfirm(it.root(), CONFIRM) }
+            if (confirm != null) NodeActions.clickNode(s, confirm)
+            val back = waitFor(3_000) { sv ->
+                val pkgNow = sv.currentPackage()
+                if ((chatPkg == null || pkgNow == chatPkg) && NodeActions.findEditableNode(sv.root()) != null &&
+                    NodeActions.findConfirm(sv.root(), CONFIRM) == null
+                ) true else null
+            }
+            if (back == true) return null
+        }
+        return "الصور اتعلّم عليها بس مقدرتش أدوس Done"
     }
 
     private suspend fun attachPhotos(step: Step.AttachPhotos): String? {
         if (!step.chatUrl.isNullOrBlank()) {
             // Existing chat: open its link inside the app, then attach from inside the chat.
-            openUrl(step.chatUrl, step.packageName.ifBlank { null })?.let { return it }
-            return attachInChat(step.count)
+            val pkg = step.packageName.ifBlank { null }
+                ?: com.daniel.assistant.commands.ChatLinks.packageFor(step.chatUrl) ?: return "مش عارف التطبيق بتاع اللينك ده"
+            openUrl(step.chatUrl, pkg)?.let { return it }
+            if (attachPrefs.getString(pkg, null) != "picker") {
+                val t0 = SystemClock.uptimeMillis()
+                when (shareIntoOpenChat(step, pkg)) {
+                    true -> {
+                        attachPrefs.edit().putString(pkg, "share").apply()
+                        log.info("الصور اتبعتت مشاركة لنفس الشات في ${SystemClock.uptimeMillis() - t0}ms")
+                        return null
+                    }
+                    false -> {
+                        // The app opened a NEW chat: remember, go back to the right chat, use the picker.
+                        attachPrefs.edit().putString(pkg, "picker").apply()
+                        log.info("التطبيق فتح شات جديد مع المشاركة — هستخدم قايمة الصور جوه الشات")
+                        openUrl(step.chatUrl, pkg)?.let { return it }
+                    }
+                    null -> Unit
+                }
+            }
+            return attachViaPicker(step.count)
         }
         val target = resolvePackage(step.packageName, step.label) ?: return "التطبيق \"${step.label}\" مش متثبت"
         PhotoSharer.share(context, target, step.count.coerceIn(1, 20), step.text)?.let { return it }

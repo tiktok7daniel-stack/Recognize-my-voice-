@@ -391,9 +391,9 @@ fun SettingsScreen(
                 Spacer(Modifier.height(10.dp))
                 NavCard(Icons.Filled.History, "السجل", "الأوامر اللي اتنفذت والأخطاء", onOpenLogs)
                 Spacer(Modifier.height(10.dp))
-                NavCard(Icons.Filled.Refresh, "إعادة تعلّم إرفاق الصور", "لو الصور بتدخل ببطء أو مرتين: يجرّب طريقة اللزق السريعة من الأول") {
-                    context.getSharedPreferences("attach_mode", android.content.Context.MODE_PRIVATE).edit().clear().apply()
-                    toast("تمام، هيجرّب الطريقة السريعة المرة الجاية")
+                NavCard(Icons.Filled.Refresh, "إعادة تعلّم إرفاق الصور", "يجرّب من الأول المشاركة السريعة لنفس الشات قبل قايمة الصور") {
+                    context.getSharedPreferences("attach_mode_v2", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+                    toast("تمام، هيجرّب المشاركة السريعة المرة الجاية")
                 }
 
                 SectionTitle("أخرى")

@@ -192,11 +192,12 @@ object NodeActions {
 
     /**
      * Photo thumbnails in a picker grid, newest first (accessibility order follows the
-     * picker's own order, which is newest-first in RTL and LTR alike).
+     * picker's own order). Each photo is returned ONCE: nested nodes of the same cell
+     * (cell + image + check mark) are merged by bounds, so a photo is never tapped twice.
      */
     fun findThumbnails(root: AccessibilityNodeInfo?, screenWidth: Int): List<AccessibilityNodeInfo> {
-        val photoWords = listOf("photo", "image", "picture", "صوره", "صور", "foto", "immagine", "taken", "التقطت", "video")
-        val out = mutableListOf<AccessibilityNodeInfo>()
+        val photoWords = listOf("photo", "image", "picture", "صوره", "صور", "foto", "immagine", "taken", "التقطت", "video", "screenshot")
+        val out = mutableListOf<Pair<AccessibilityNodeInfo, Rect>>()
         val r = Rect()
         walk(root) { n ->
             if (!n.isVisibleToUser) return@walk
@@ -204,16 +205,30 @@ object NodeActions {
             val w = r.width(); val h = r.height()
             if (w < screenWidth * 0.14 || w > screenWidth * 0.6 || h == 0) return@walk
             val ratio = w.toFloat() / h
-            if (ratio < 0.7f || ratio > 1.45f) return@walk
+            if (ratio < 0.6f || ratio > 1.6f) return@walk
             val l = labels(n)
             val looksPhoto = photoWords.any { l.contains(it) } ||
                 (n.className?.toString()?.contains("Image") == true && n.text.isNullOrBlank())
-            if (looksPhoto && (n.isClickable || n.isCheckable || clickableParent(n) != null)) {
-                val target = if (n.isClickable || n.isCheckable) n else clickableParent(n)!!
-                if (out.none { it == target }) out.add(target)
+            if (!looksPhoto) return@walk
+            val target = when {
+                n.isClickable || n.isCheckable -> n
+                else -> clickableParent(n) ?: return@walk
             }
+            val tr = Rect().also { target.getBoundsInScreen(it) }
+            // Same photo cell already taken (overlapping bounds)? Skip.
+            if (out.any { (_, b) -> Rect.intersects(b, tr) && (b.contains(tr.centerX(), tr.centerY()) || tr.contains(b.centerX(), b.centerY())) }) return@walk
+            out.add(target to tr)
         }
-        return out
+        return out.map { it.first }
+    }
+
+    /** The picker's confirm button ("Done", "Add", "تم"…) — exact label match first. */
+    fun findConfirm(root: AccessibilityNodeInfo?, words: List<String>): AccessibilityNodeInfo? {
+        val w = words.map { ArabicNormalizer.normalize(it) }
+        val nodes = visibleNodes(root).filter { n -> (n.isClickable || clickableParent(n) != null) && !n.isEditable }
+        fun label(n: AccessibilityNodeInfo) = ArabicNormalizer.normalize((n.text ?: n.contentDescription)?.toString().orEmpty())
+        return nodes.firstOrNull { n -> label(n) in w }
+            ?: nodes.firstOrNull { n -> val l = label(n); l.isNotBlank() && l.length <= 20 && w.any { l.startsWith("$it ") || l.startsWith("$it(") } }
     }
 
     /** First on/off switch on screen (Wi-Fi / Bluetooth panels). */

@@ -113,10 +113,11 @@ Sharing photos to an app always starts a **new** chat. To keep using the same ch
   `https://claude.ai/chat/…`). When it is set, Nabra opens that exact chat inside the app, taps
   **+ → Photos**, selects the newest photos, confirms, and the next steps type and send in the
   same chat.
-* **Fast attach**: the photos are first **pasted from the clipboard** (FileProvider copies), which
-  is instant if the app accepts pasted images. The result is learned per app, and apps that don't
-  accept paste use the + → Photos picker, driven by polling. *Settings → Reset photo attach* clears
-  what was learned.
+* **Fast attach**: Nabra opens the chat, then **shares** the newest photos to the app as before,
+  and checks the chat title to confirm they landed in the same chat. If the app opened a new chat
+  instead, Nabra remembers that, goes back to the chat, and uses the in-chat photo picker. The
+  picker taps each photo once and then **Done**, and waits until the picker closes.
+  *Settings → Reset photo attach* clears what was learned.
 * The new step types *Open link / specific chat* and *Attach photos inside the open chat* can be
   used separately in any command. Links for Claude, ChatGPT, Gemini, WhatsApp and Telegram open
   inside the app.

@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * Runs command chains step by step. Every UI step polls the accessibility
@@ -242,27 +245,83 @@ class CommandExecutor(
     private val CONFIRM = listOf("add", "done", "select", "upload", "attach", "ok", "send", "اضافه", "اضف", "تم", "اختيار",
         "موافق", "ارفاق", "aggiungi", "fine", "seleziona", "carica", "allega")
 
-    /** Attaches the newest [count] photos from inside the open chat: + → Photos → pick → confirm. */
+    private val attachPrefs by lazy { context.getSharedPreferences("attach_mode", Context.MODE_PRIVATE) }
+
+    /**
+     * Attaches the newest [count] photos inside the open chat.
+     * Fast path: put the photos on the clipboard and paste them into the message box
+     * (instant, like pasting an image in WhatsApp). The result is remembered per app; apps
+     * that don't accept pasted images use the (optimized) + → Photos → pick → confirm path.
+     */
     private suspend fun attachInChat(count: Int): String? {
         val s = service() ?: return NO_ACCESSIBILITY
-        val attach = waitFor(7_000) { NodeActions.findAttachButton(it.root()) } ?: return "مش لاقي زرار الإرفاق (+) في الشات"
-        NodeActions.clickNode(s, attach)
-        delay(700)
-        // Many apps show a menu first (Camera / Photos / Files).
-        waitFor(2_000) { NodeActions.findByWords(it.root(), PHOTO_OPTION, exclude = listOf("camera", "كاميرا")) }
-            ?.let { NodeActions.clickNode(s, it); delay(900) }
+        val pkg = s.currentPackage() ?: ""
+        val mode = attachPrefs.getString(pkg, null)
+        if (mode != "picker") {
+            val t0 = SystemClock.uptimeMillis()
+            if (pastePhotos(count)) {
+                attachPrefs.edit().putString(pkg, "paste").apply()
+                log.info("الصور اتلزقت في ${SystemClock.uptimeMillis() - t0}ms")
+                return null
+            }
+            if (mode == null) attachPrefs.edit().putString(pkg, "picker").apply()
+        }
+        return attachViaPicker(count)
+    }
+
+    /** Clipboard paste of the photos into the focused message box. True when the UI changed. */
+    private suspend fun pastePhotos(count: Int): Boolean {
+        val uris = withContext(Dispatchers.IO) { PhotoSharer.copyLatestToCache(context, count.coerceIn(1, 10)) }
+        if (uris.isEmpty()) return false
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newUri(context.contentResolver, "photos", uris.first())
+        uris.drop(1).forEach { clip.addItem(android.content.ClipData.Item(it)) }
+        cm.setPrimaryClip(clip)
+        val edit = waitFor(4_000) { NodeActions.findEditableNode(it.root()) } ?: return false
+        val before = NodeActions.visibleNodes(service()?.root()).size
+        edit.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        if (!edit.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return false
+        // Success = new attachment previews appear; failure = nothing (or a "content://" text).
+        val changed = waitFor(1_500) { sv ->
+            val root = sv.root()
+            val box = NodeActions.findEditableNode(root)
+            if (box?.text?.contains("content://") == true) false
+            else if (NodeActions.visibleNodes(root).size > before) true else null
+        } ?: false
+        if (!changed) NodeActions.findEditableNode(service()?.root())?.let { box ->
+            if (box.text?.contains("content://") == true) NodeActions.setText(box, "")
+        }
+        return changed
+    }
+
+    private val PHOTO_OPTION = listOf("photos", "photo library", "gallery", "images", "library", "choose photo", "upload photo",
+        "الصور", "صور", "المعرض", "الاستوديو", "foto", "galleria", "immagini")
+    private val CONFIRM = listOf("add", "done", "select", "upload", "attach", "ok", "send", "اضافه", "اضف", "تم", "اختيار",
+        "موافق", "ارفاق", "aggiungi", "fine", "seleziona", "carica", "allega")
+
+    /** + → (Photos) → newest N → confirm, driven by polling instead of fixed pauses. */
+    private suspend fun attachViaPicker(count: Int): String? {
+        val s = service() ?: return NO_ACCESSIBILITY
         val width = s.resources.displayMetrics.widthPixels
-        val thumbs = waitFor(6_000) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
-            ?: return "مش لاقي الصور في القايمة"
+        val attach = waitFor(5_000) { NodeActions.findAttachButton(it.root()) } ?: return "مش لاقي زرار الإرفاق (+) في الشات"
+        NodeActions.clickNode(s, attach)
+        // Recent photos may already be in the sheet; otherwise open "Photos".
+        var thumbs = waitFor(1_200) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
+        if (thumbs == null) {
+            waitFor(1_500) { NodeActions.findByWords(it.root(), PHOTO_OPTION, exclude = listOf("camera", "كاميرا")) }
+                ?.let { NodeActions.clickNode(s, it) }
+            thumbs = waitFor(5_000) { NodeActions.findThumbnails(it.root(), width).takeIf { l -> l.isNotEmpty() } }
+                ?: return "مش لاقي الصور في القايمة"
+        }
         thumbs.take(count.coerceIn(1, 20)).forEach { t ->
             NodeActions.clickNode(s, t)
-            delay(300)
+            delay(120)
         }
-        delay(300)
         // Multi-select pickers need a confirm button; single-pick ones return by themselves.
-        waitFor(2_500) { NodeActions.findByWords(it.root(), CONFIRM, exclude = listOf("cancel", "الغاء", "annulla")) }
+        waitFor(1_500) { NodeActions.findByWords(it.root(), CONFIRM, exclude = listOf("cancel", "الغاء", "annulla")) }
             ?.let { NodeActions.clickNode(s, it) }
-        delay(900)
+        // Back in the chat when the message box is visible again.
+        waitFor(3_000) { NodeActions.findEditableNode(it.root()) }
         return null
     }
 
@@ -270,7 +329,6 @@ class CommandExecutor(
         if (!step.chatUrl.isNullOrBlank()) {
             // Existing chat: open its link inside the app, then attach from inside the chat.
             openUrl(step.chatUrl, step.packageName.ifBlank { null })?.let { return it }
-            delay(600)
             return attachInChat(step.count)
         }
         val target = resolvePackage(step.packageName, step.label) ?: return "التطبيق \"${step.label}\" مش متثبت"

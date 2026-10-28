@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
@@ -389,6 +390,11 @@ fun SettingsScreen(
                 NavCard(Icons.Filled.FileDownload, "استيراد أوامر", "من ملف JSON") { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
                 Spacer(Modifier.height(10.dp))
                 NavCard(Icons.Filled.History, "السجل", "الأوامر اللي اتنفذت والأخطاء", onOpenLogs)
+                Spacer(Modifier.height(10.dp))
+                NavCard(Icons.Filled.Refresh, "إعادة تعلّم إرفاق الصور", "لو الصور بتدخل ببطء أو مرتين: يجرّب طريقة اللزق السريعة من الأول") {
+                    context.getSharedPreferences("attach_mode", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+                    toast("تمام، هيجرّب الطريقة السريعة المرة الجاية")
+                }
 
                 SectionTitle("أخرى")
                 NavCard(Icons.Filled.School, "الشرح خطوة بخطوة", "إزاي Nabra بيشتغل وإزاي تعمل أول أمر", onOpenTutorial)

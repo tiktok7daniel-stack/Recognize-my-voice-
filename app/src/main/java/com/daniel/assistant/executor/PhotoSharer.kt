@@ -26,6 +26,25 @@ object PhotoSharer {
         return out
     }
 
+    /**
+     * Copies the newest [count] photos into our cache and returns FileProvider URIs —
+     * these can be granted to any app (e.g. through the clipboard).
+     */
+    fun copyLatestToCache(context: Context, count: Int): List<Uri> {
+        val dir = java.io.File(context.cacheDir, "shared").apply { deleteRecursively(); mkdirs() }
+        val cr = context.contentResolver
+        return latestImages(context, count).mapIndexedNotNull { i, src ->
+            runCatching {
+                val ext = when (cr.getType(src)) {
+                    "image/png" -> "png"; "image/webp" -> "webp"; "image/heic" -> "heic"; else -> "jpg"
+                }
+                val f = java.io.File(dir, "nabra_${System.currentTimeMillis()}_$i.$ext")
+                cr.openInputStream(src)!!.use { input -> f.outputStream().use { input.copyTo(it, 1 shl 16) } }
+                androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".files", f)
+            }.getOrNull()
+        }
+    }
+
     /** Returns null on success or an Arabic error message. */
     fun share(context: Context, targetPackage: String, count: Int, text: String? = null): String? {
         val uris = try {

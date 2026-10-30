@@ -308,7 +308,8 @@ class CommandExecutor(
         val pickerPkg = s.currentPackage()
         fun inPicker(sv: AssistantAccessibilityService): Boolean =
             if (pickerPkg != null && pickerPkg != chatPkg) sv.currentPackage() == pickerPkg
-            else NodeActions.findThumbnails(sv.root(), width).isNotEmpty()
+            // Same app: the picker covers the chat; once the reply box is back, the photos are in.
+            else NodeActions.findEditableNode(sv.root()) == null && NodeActions.findThumbnails(sv.root(), width).isNotEmpty()
         repeat(2) {
             val confirm = waitFor(2_000) { sv ->
                 if (!inPicker(sv)) null

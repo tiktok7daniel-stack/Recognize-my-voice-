@@ -71,7 +71,7 @@ fun CommandsListScreen(onNew: () -> Unit, onEdit: (Long) -> Unit) {
                     CommandCard(
                         cmd,
                         onToggle = { scope.launch { c.repo.setEnabled(cmd.id, it) } },
-                        onTest = { c.executor.run(cmd) },
+                        onTest = { c.executor.run(cmd, force = true) },
                         onEdit = { onEdit(cmd.id) },
                         onDelete = { toDelete = cmd },
                     )

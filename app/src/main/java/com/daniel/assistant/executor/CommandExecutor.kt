@@ -57,12 +57,36 @@ class CommandExecutor(
 
     var stepTimeoutMs = 5_000L
 
-    fun run(command: CustomCommand, vars: Map<String, String> = emptyMap(), announce: Boolean = true): Job {
+    /** Last finished command + when — a voice trigger heard twice must not run it twice. */
+    private var lastName: String? = null
+    private var lastEndAt = 0L
+
+    fun run(
+        command: CustomCommand,
+        vars: Map<String, String> = emptyMap(),
+        announce: Boolean = true,
+        force: Boolean = false,
+    ): Job {
+        if (!force) {
+            if (_running.value == command.name) {
+                log.info("\"${command.name}\" شغال بالفعل — اتجاهل التكرار")
+                return job ?: Job()
+            }
+            if (command.name == lastName && SystemClock.uptimeMillis() - lastEndAt < REPEAT_GUARD_MS) {
+                log.info("\"${command.name}\" لسه متنفذ — اتجاهل التكرار")
+                return Job()
+            }
+        }
         cancel()
         return scope.launch {
             if (announce) feedback.say("حاضر")
             if (vars.isNotEmpty()) log.info("متغيرات: " + vars.entries.joinToString { "${it.key}=${it.value}" })
-            execute(command.name, command.steps.map { it.withVars(vars) })
+            val ok = execute(command.name, command.steps.map { it.withVars(vars) })
+            if (ok) {
+                lastName = command.name
+                lastEndAt = SystemClock.uptimeMillis()
+                if (announce) feedback.say("خلصت")
+            }
         }.also { job = it }
     }
 
@@ -254,6 +278,7 @@ class CommandExecutor(
     /** Attaches the newest [count] photos inside the open chat (+ → Photos → pick → Done). */
     private suspend fun attachInChat(count: Int): String? = attachViaPicker(count)
 
+    private val REPEAT_GUARD_MS = 10_000L
     private val CONFIRM = listOf("done", "add", "select", "upload", "attach", "ok", "تم", "اضافه", "اضف", "اختيار",
         "موافق", "ارفاق", "fatto", "aggiungi", "fine", "seleziona", "carica", "allega")
     private val PHOTO_OPTION = listOf("photos", "photo library", "gallery", "images", "library", "choose photo", "upload photo",

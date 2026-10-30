@@ -355,6 +355,7 @@ class ListeningService : Service() {
         } ?: return
         instantJob = scope.launch {
             if (instantDelayMs > 0) delay(instantDelayMs)
+            if (c.executor.running.value != null) return@launch
             firedInstant = key
             firedInstantAt = android.os.SystemClock.uptimeMillis()
             c.brain.runInstant(cmd, partial)

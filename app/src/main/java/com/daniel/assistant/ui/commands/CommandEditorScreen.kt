@@ -152,7 +152,7 @@ fun CommandEditorScreen(commandId: Long?, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize()) {
             ScreenHeader(if (commandId == null) "أمر جديد" else "تعديل الأمر", onBack = onBack) {
                 IconButton(onClick = {
-                    if (steps.isNotEmpty()) c.executor.run(CustomCommand(name = name.ifBlank { "تجربة" }, triggers = emptyList(), steps = steps.map { it.step }))
+                    if (steps.isNotEmpty()) c.executor.run(CustomCommand(name = name.ifBlank { "تجربة" }, triggers = emptyList(), steps = steps.map { it.step }), force = true)
                 }) { Icon(Icons.Filled.PlayArrow, "تجربة", tint = Neo.Cyan) }
             }
             if (!loaded) return@Column

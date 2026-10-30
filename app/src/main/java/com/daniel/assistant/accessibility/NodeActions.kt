@@ -206,6 +206,8 @@ object NodeActions {
             if (w < screenWidth * 0.14 || w > screenWidth * 0.6 || h == 0) return@walk
             val ratio = w.toFloat() / h
             if (ratio < 0.6f || ratio > 1.6f) return@walk
+            // Real thumbnails have no visible text; "Photos" / "Camera" / "Files" tiles do.
+            if (!n.text.isNullOrBlank()) return@walk
             val l = labels(n)
             val looksPhoto = photoWords.any { l.contains(it) } ||
                 (n.className?.toString()?.contains("Image") == true && n.text.isNullOrBlank())
@@ -214,12 +216,21 @@ object NodeActions {
                 n.isClickable || n.isCheckable -> n
                 else -> clickableParent(n) ?: return@walk
             }
+            if (!target.text.isNullOrBlank() || hasTextChild(target)) return@walk
             val tr = Rect().also { target.getBoundsInScreen(it) }
             // Same photo cell already taken (overlapping bounds)? Skip.
             if (out.any { (_, b) -> Rect.intersects(b, tr) && (b.contains(tr.centerX(), tr.centerY()) || tr.contains(b.centerX(), b.centerY())) }) return@walk
             out.add(target to tr)
         }
         return out.map { it.first }
+    }
+
+    private fun hasTextChild(n: AccessibilityNodeInfo): Boolean {
+        for (i in 0 until n.childCount) {
+            val ch = n.getChild(i) ?: continue
+            if (!ch.text.isNullOrBlank() || hasTextChild(ch)) return true
+        }
+        return false
     }
 
     /** The picker's confirm button ("Done", "Add", "تم"…) — exact label match first. */

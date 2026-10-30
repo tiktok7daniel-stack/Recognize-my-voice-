@@ -303,19 +303,24 @@ class CommandExecutor(
             NodeActions.clickNode(s, t)
             delay(180)
         }
-        // Done / Add — then make sure the picker really closed (retry once).
+        // Done / Add — only ever inside the picker. Back in the chat, the "+" button can be labelled
+        // "Add" too: tapping it again reopened the menu and attached the photos a second time.
+        val pickerPkg = s.currentPackage()
+        fun inPicker(sv: AssistantAccessibilityService): Boolean =
+            if (pickerPkg != null && pickerPkg != chatPkg) sv.currentPackage() == pickerPkg
+            else NodeActions.findThumbnails(sv.root(), width).isNotEmpty()
         repeat(2) {
-            val confirm = waitFor(2_000) { NodeActions.findConfirm(it.root(), CONFIRM) }
+            val confirm = waitFor(2_000) { sv ->
+                if (!inPicker(sv)) null
+                else NodeActions.findConfirm(sv.root(), CONFIRM)?.takeIf { it != NodeActions.findAttachButton(sv.root()) }
+            }
             if (confirm != null) NodeActions.clickNode(s, confirm)
             val back = waitFor(3_000) { sv ->
-                val pkgNow = sv.currentPackage()
-                if ((chatPkg == null || pkgNow == chatPkg) && NodeActions.findEditableNode(sv.root()) != null &&
-                    NodeActions.findConfirm(sv.root(), CONFIRM) == null
-                ) true else null
+                if (!inPicker(sv) && NodeActions.findEditableNode(sv.root()) != null) true else null
             }
             if (back == true) return null
         }
-        return "الصور اتعلّم عليها بس مقدرتش أدوس Done"
+        return if (!inPicker(s)) null else "الصور اتعلّم عليها بس مقدرتش أدوس Done"
     }
 
     private suspend fun attachPhotos(step: Step.AttachPhotos): String? {
